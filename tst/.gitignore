@@ -1,0 +1,17 @@
+/.deps/
+/Makefile
+/Makefile.in
+/psmqd.log
+/psmqd_test
+/psmqd_test.log
+/psmqd_test.trs
+/test-suite.log
+/psmq-progs.sh.log
+/psmq-progs.sh.trs
+/tpsmqd.log
+/tpsmqd.stderr
+/tpsmqd.stdout
+/tpsmqp.stderr
+/tpsmqp.stdout
+/tpsmqs.stderr
+/tpsmqs.stdout
