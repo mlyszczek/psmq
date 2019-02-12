@@ -1,6 +1,6 @@
 include Makefile.am.coverage
 ACLOCAL_AMFLAGS=-I m4
-SUBDIRS = lib src tst inc
+SUBDIRS = lib src tst inc www man
 
 if HAVE_GCOV
 clean-local: clean-gcov
@@ -17,10 +17,10 @@ analyze:
 	make analyze -C src
 	make analyze -C lib
 	make analyze -C tst
-#
-#www:
+
+www:
 #	./gen-download-page.sh
-#	./man2html.sh
-#	make www -C www
+	./man2html.sh
+	make www -C www
 
 .PHONY: analyze www
