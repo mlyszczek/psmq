@@ -1,0 +1,120 @@
+.TH "psmq_subscribe" "3" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.BR psmq_subscribe ,\  psmq_unsubscribe
+- control subscriptions for the client.
+.SH SYNOPSIS
+.PP
+.BI "#include <psmq.h>"
+.PP
+.BI "int psmq_subscribe(struct psmq *" psmq ", const char *" topic ")"
+.br
+.BI "int psmq_unsubscribe(struct psmq *" psmq ", const char *" topic ")"
+.SH DESCRIPTION
+.PP
+Once you connected to the broker you still won't be able to receive messages
+until you subscribe to something, as broker will send only messages that are
+interesting to you.
+.PP
+.BR psmq_subscribe (3)
+allows you to tell the broker, you want to receive all messages that matches
+passed
+.IR topic .
+You can read more about topics page
+.BR psmq_overview (7)
+page.
+When subscribing, you can use wildcards.
+.PP
+.BR psmq_unsubscribe (3)
+simply removes your client from given
+.I topic
+so you won't receive messages, that matches this
+.I topic
+anymore.
+This must be exact
+.I topic
+that was used in subscribe message, including wildcard.
+If you subscribed to "/can/engine/*", you have to use exacly same string
+to unsubsribe, you cannot unsubscribe from "/can/engine/rpm".
+If you need to receive all "/can/engine/*" messages except for
+"/can/engine/rpm", you need to either subscribe to all other topics one by one,
+or simply ignore "rpm" topic in you application.
+.PP
+You should subscribe to all needed topics prior to calling
+.BR psmq_enable (3).
+It is because, broker will send
+.B ACK
+message with subscription confirmation, which library normally handles, but if
+you enabled data reception already,
+.B psmq
+library won't read the
+.B ACK
+message, so it doesn't read by mistake message directed to the client.
+You can of course subscribe and unsubscribe with client being enabled, but keep
+in mind, you will receive message from the broker, with topic
+.RB \' -s \'
+and 1 byte (unsigned char )of payload, which will 0 in case subscription
+was successfull, or errno value otherwise.
+.SH "EMBEDDED SYSTEM NOTES"
+.PP
+Both
+.BR psmq_subscribe (3)
+and
+.BR psmq_unsubscribe (3)
+will cause broker to call
+.BR malloc ()
+and
+.BR free (),
+respectively.
+Belive it or not, it's to save a lots of memory.
+Remember, it's not
+.BR malloc ()
+you should be afraid of, it's
+.BR free ().
+.SH "RETURN VALUE"
+.PP
+0 on success. -1 on errors with appropriate errno set.
+.SH ERRORS
+.TP
+.B EINVAL
+.I psmq
+or
+.I topic
+is
+.B NULL
+.TP
+.B EBADF
+.I psmq
+object has no yet been initialized.
+.TP
+.B EINVAL
+.I topic
+does not start from \'/\' character.
+.TP
+.B ENOBUFS
+.I topic
+is too long and doesn't fit into transmit buffer.
+You need to recompile
+.B psmq
+with bigger
+.BR PSMQ_TOPIC_MAX .
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

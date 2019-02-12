@@ -1,0 +1,130 @@
+.TH "psmq_publish" "3" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.B psmq_publish
+- publish message over
+.BR psmq.
+.SH SYNOPSIS
+.PP
+.BI "#include <psmq.h>"
+.PP
+.BI "int psmq_publish(struct psmq *" psmq ", const char *" topic ", \
+const void *" payload ", size_t " paylen ", unsigned int " prio ")"
+.SH DESCRIPTION
+.PP
+Publishes message with
+.I payload
+data of size
+.I paylen
+on
+.I topic
+with specified
+.I prio
+to broker connected in
+.IR psmq .
+It's ok to set
+.I payload
+to
+.BR NULL .
+In that case
+.I paylen
+will be automatically set to 0.
+.PP
+If broker's control mqueue is full then this function will block until broker
+deals with some messages and make place in the queue.
+Note that broker never blocks waiting for clients, so messages from mqueue are
+processed immediately and without unnecessary delays.
+.PP
+Successfull call means that message has been put into broker's queue with
+success it doesn't necessary mean that any client will receives that message.
+It is possible that no clients currently listens on sent
+.I topic
+or client's queue is full and broker dropped that message instead.
+.PP
+When publishing you need to publish to very specific topic (like
+"/can/engine/rpm") - you cannot use
+wildcards in
+.I topic
+(like "/can/engine/+").
+.SH "RETURN VALUE"
+.PP
+0 on success. -1 on errors with appropriate errno set.
+.SH ERRORS
+.TP
+.B EINVAL
+.I psmq
+or
+.I topic
+is
+.B NULL
+.TP
+.B EBADF
+.I psmq
+has not yet been initialized
+.TP
+.B ENOBUFS
+.I topic
+or
+.I payload
+are too big to fit into message buffer.
+.TP
+.B EBADMSG
+.I topic
+does not start with \'/\' character.
+.SH EXAMPLE
+Send message over
+.B psmq
+with information about revolution per minute of engine.
+Error checking ommited for better readability.
+.PP
+.nf
+    #include <psmq.h>
+
+    int main(void)
+    {
+        struct psmq psmq;
+        int rpm;
+
+        /* initialize psmq object that will create /pub mqueue for
+         * receiving data, and will connect to broker of name /brok.
+         * Max items in queue is set to 10
+         */
+        psmq_init(&psmq, "/brok", "/sub", 10);
+
+        /* if we don't want to receive any message, we can skip
+         * susbscribe and enable functions.
+         *
+         * Now simply send message to broker
+         */
+
+        rpm = 1;
+        psmq_publish(&psmq, "/can/engine/rpm", &rpm, sizeof(rpm), 0);
+
+        /* after work is finished, we need to deregister from broker to
+         * make space in broker for another client
+         */
+
+        psmq_cleanup(&psmq);
+        return 0;
+    }
+.nf
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

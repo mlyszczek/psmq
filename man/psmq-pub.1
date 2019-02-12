@@ -1,0 +1,103 @@
+.TH "psmq-pub" "1" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.B psmq-pub
+- helper tool to publish message on specific topic
+.SH SYNOPSIS
+.PP
+.B psmq-pub
+.RB [ -h
+|
+.BR -v ]
+.br
+.B psmq-pub
+.RB ( -b
+.IR name )
+.RB ( -t
+.IR topic )
+.RB [ -m
+.IR message ]
+.RB [ -n
+.IR mqueue-name ]
+.RB [ -p
+.IR prio ]
+.SH DESCRIPTION
+.TP
+.B -h
+Prints short help and exits
+.TP
+.B -v
+Prints version information and exits
+.TP
+.BI -n\  mqueue-name
+mqueue
+.B psmq-sub
+will create and use to communicate with broker.
+This argument is optional and by default
+.B /psmq_pub
+will be used.
+.TP
+.BI -b\  name
+mqueue
+.I name
+of the broker you want to use for communication.
+This option is mandatory
+.TP
+.BI -t\  topic
+.I topic
+you want message to be sent on.
+Note, you cannot use wildcards when publishing message.
+.TP
+.BI -m\  message
+.I message
+you want to publish.
+This is optional argument, if you don't pass it, program will read data
+from stdin.
+One
+.B psmq
+message will be sent per every new line.
+Input is read until end of file is encoutered.
+.TP
+.BI -p\  prio
+Priority of the message.
+Every message is sent with priority and broker will always send messages to
+receiving clients with highest priority first.
+Default priority is 0 if not specified.
+Higher values means higher priority.
+Priority is limited by system's implementation of mqueue.
+Please refer to it to see maximum priority value.
+.SH EXAMPLES
+.TP
+Send single message with default priority
+.B psmq-pub
+-b/brok -t/topic1 -m "test message to send"
+.TP
+Publish content of the file with priority 5
+cat file-with-content |
+.B psmq-pub
+-b/brok -t/topic1 -p5
+.TP
+Send sequence of binary data
+printf "\\x13\\x37\\x04\\x51" |
+.B psmq-pub
+-b/brok -t/topic1
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

@@ -1,0 +1,57 @@
+.TH "psmq_cleanup" "3" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.B psmq_cleanup
+- cleans up whatever has been initialized by
+.BR psmq_init (3).
+.SH SYNOPSIS
+.PP
+.BI "#include <psmq.h>"
+.PP
+.BI "int psmq_cleanup(struct psmq *" psmq ")"
+.SH DESCRIPTION
+.PP
+Sends close message to the broker and closes message queues associated with
+the client.
+.PP
+It is important to call this if you are done with the broker.
+If you close application without calling this, you will make sort of a memory
+leak, since broker will still have opened connection with that client and you
+can use up all of broker's slot for new connections, and then broker will refuse
+any new conneciton.
+Only way to close it is to call this function before losing
+.I psmq
+object.
+.SH "RETURN VALUE"
+.PP
+0 on success. -1 on errors with appropriate errno set.
+.SH ERRORS
+.TP
+.B EINVAL
+.I psmq
+is
+.B NULL
+.TP
+.B EBADF
+.I psmq
+object has no yet been initialized.
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

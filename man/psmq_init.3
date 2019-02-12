@@ -1,0 +1,132 @@
+.TH "psmq_init" "3" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.B psmq_init
+- initializes
+.B psmq
+object and initializes connection with the broker.
+.SH SYNOPSIS
+.PP
+.BI "#include <psmq.h>"
+.PP
+.BI "int psmq_init(struct psmq *" psmq ", const char *" brokername ", \
+const char *" mqname ", int " maxmsg ")"
+.SH DESCRIPTION
+.PP
+Function initializes passed
+.I psmq
+object, opens
+.I brokername
+mqueue for writing, and creates
+.I mqname
+mqueue for reading with
+.IR maxmsg .
+After successfull initializations of mqueue objects, function will register
+with the
+.I brokername
+and will send him
+.IR mqname .
+.I mqname
+mqueue is used by the broker to send messages back to client.
+.PP
+Both
+.I mqname
+and
+.I brokername
+must start with \'/\' character (regardless of OS in use) and full name format
+is OS dependent.
+For example,
+.B QNX
+allows names with multiple \'/\', like "/name/of/mq", but
+.B Linux
+allows only one slash - at the beginning, so "/name" is only acceptable
+there.
+Refer to your system's manual about mqueue for details.
+.PP
+.I maxmsg
+defines how much messages can be queued in
+.I mqname
+before broker will start droping messages.
+If this value is not big enough, and your program is not quick enough to
+process incoming data from queue, when queue gets full, broker will drop
+incoming messages until there is place in the queue again.
+Lost packets are lost though.
+.SH "RETURN VALUE"
+.PP
+When all memory has been allocated properly and broker sends back register
+confirmation, 0 is returned.
+Else -1 is returned and appropriate errno is set.
+.SH ERRORS
+.TP
+.B EINVAL
+This eror is returned when at least one of these are true:
+.RS 4
+*
+.I psmq
+is
+.B NULL
+.br
+*
+.I brokername
+is
+.B NULL
+.br
+*
+.I brokername
+doesn't start with \'/\'
+.br
+*
+.I mqname
+is
+.B NULL
+.br
+*
+.I mqname
+doesn't start with \'/\'
+.br
+*
+.I maxmsg
+is less than 1
+.br
+*
+.I maxmsg
+is greater than maximum value supported by OS.
+.RE
+.TP
+.B ENAMETOOLONG
+Length of the
+.I mqname
+is too big and cannot fit into payload that is sent to broker upon registration.
+This value is set during compile time, check
+.BR psmq_building (7)
+for details.
+.TP
+.B ENOENT
+Specified
+.I brokername
+doesn't exist.
+Either provided name is wrong, or broker is not running.
+.TP
+.B ENOSPC
+Broker is full of clients and won't accept any new connections until any of
+the clients disconnects.
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

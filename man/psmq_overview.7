@@ -1,0 +1,234 @@
+.TH "psmq_overview" "7" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.B psmq
+-
+.BR p ublish\  s ubscribe\  m essage\  q ueue
+.SH SYNOPSIS
+.PP
+.B psmq
+-
+is a set of programs and libraries to implement publish/subscribe communication
+over
+.B POSIX
+message queues.
+.PP
+This page shortly describes each component of the tool and more information
+about each component can be found on their own pages.
+.SH DESCRIPTION
+.SS PUBLISH/SUBSCRIBE
+.PP
+The
+.B psmq
+communication is based on the publish subscribe principle.
+Multiple clients can connect to the broker.
+Any client can subscribe to any ammount of topics and any client can send
+message to any topic.
+Such message will be received by all clients that are subsribed to the topic.
+It is perfectly ok for many clients to subsribe to same topic as for many
+clients to send message to same topic.
+One client can be both subscriber and publisher simultaneously.
+.SS TOPICS
+.PP
+As described earlier, clients communicate with each other sending and receiving
+messages on specific topic.
+Topic is simple c-string that starts with \'/\' character.
+Altough topic is string, and may contain non-printable characters it is
+advisible to use only printable chars and no spaces, it will be easier later to
+read/debug such messages.
+.PP
+Topics are in form of hierarchy, very similar to UNIX paths.
+So every topic should begin with \'/\' character, and each category should be
+delimited with \'/\' character as well.
+Some examples can be:
+.PP
+.nf
+    /engine/2/rpm
+    /engine/2/power
+    /can/room/142/kitchen/temperature
+    /can/room/142/bedroom/temperature
+    /voltage
+.fi
+.PP
+You can use any structure that best suits your needs.
+.PP
+While both publishers and subscribers can use full form of topics, subsribers
+can use
+.B wildcards
+to subscribe to multiple topics with one subscription.
+There are 2 wildards.
+.PP
+First one is
+.B +
+(plus) character.
+It can be used to accept anything that may show in one part of structure.
+Let\'s look back at examples of topic.
+If we want to subsribe to read temperature in every hotel room, but only in
+the kitchen, we need to subscribe to
+.PP
+.nf
+    /can/room/+/kitchen/temperature
+.fi
+.PP
+Should we need to read temperature in all hotel rooms, in all rooms, we will
+subscribe to
+.PP
+.nf
+    /can/room/+/+/temperature
+.fi
+.PP
+We can put wildcards in any place in structure.
+To subscribe to every sensor in all hotel rooms in bedrooms, subscribe to this:
+.PP
+.nf
+    /can/room/+/bedroom/+
+.fi
+.PP
+Or get all sensors from all hotel rooms
+.PP
+.nf
+    /can/room/+/+/+
+.fi
+.PP
+For this wildcard to work, plus character must be alone, that is "/can/room+/+"
+will treat "room+" part as standard topic and not wildcard.
+Some more examples, for message sent on topic "/a/b/c/d" following subscriptions
+will match
+.PP
+.nf
+    /a/b/c/d
+    /a/+/c/d
+    /a/b/c/+
+    /+/b/c/+
+    /+/+/+/+
+    /a/+/b/+
+.fi
+.PP
+But these will
+.B not
+match:
+.PP
+.nf
+    /a/b/c
+    /a/b/+
+    /a/b/c/+/e
+    /a/b/c/d/+
+    /+/+/+/+/e
+.fi
+.PP
+Note, that above wildcard will not receive sensor if structure differs a bit,
+and sensor value is sent on topic "/can/room//142/kitchen/fridge/temperature".
+If structure is not regular, you might be better of with another wildcard.
+.PP
+Another type of wildcard is
+.B *
+(star) character.
+This allows to accept rest of the topic from the wildcard till the end.
+So to subscribe to all sensors from all hotel rooms, instead of putting 3 plus
+wildcards, we can use this:
+.PP
+.nf
+    /can/room/*
+.fi
+.PP
+Now, we will receive every topic that starts from "/can/room/" (but we won\'t
+receive message send directly to "/can/room").
+With this wildcard, we will receive all informations from all rooms, regardless
+of how many part structure has.
+Some more examples, for message sent on topic "/a/b/c/d" following subscriptions
+will match
+.PP
+.nf
+    /a/b/c/*
+    /a/*
+    /*
+.fi
+.PP
+and "/a/b/c/d/*" will not match.
+"/*" subscription will effectively match all messages.
+.PP
+For this wildcard to work, star character must be alone at the very end of
+topic, otherwise it will be treated as ordinary topic.
+.PP
+Wildcards can also be mixed together.
+So, assuming irregular sensor structure in kitchen, to receive information
+from all sensor in all kitches, it would be best to use
+.PP
+.nf
+    /can/room/+/kitchen/*
+.fi
+.PP
+This will match both "/can/room/+/kitchen/temperature" and
+"/can/room/+/kitchen/fridge/temperature".
+.PP
+A quick summary for topic rules:
+.PP
+* topic is a standard c-string, all characters but null \'\\0\' are allowed
+.br
+* topic must start with \'/\' (slash) character
+.br
+* topic must not end with \'/\' (slash) character
+.br
+* empty parts of topic (like /a//c) are not allowed
+.br
+* for wildcards to work, they must be the only character in single topic part
+.br
+* \'+\' (plus) wildcard, can be places anywhere
+.br
+* \'*\' (star) wildcard, must be last character in the topic
+.SS BROKER
+.PP
+.BR psmqd (1)
+is a main daemon application which functions as a broker for the clients.
+It receives messages from the clients and relays messages to all clients that
+subscribed to specified topic.
+.SS LIBRARY
+.PP
+.B libpsmq
+is a helper library that can be used by clients to make it easy to send and
+receive messages from/to broker.
+Following functions are available
+.TS
+l	l.
+\fBpsmq_init\fR(3)	initializes psmq object and connects to the broker
+\fBpsmq_cleanup\fR(3)	cleanup whatever has been allocated by init
+\fBpsmq_publish\fR(3)	publishes message on given topic
+\fBpsmq_enable\fR(3)	tells broker that we are read to receive messages
+\fBpsmq_disable_threaded\fR(3)	same as above but for multithread environment
+\fBpsmq_receive\fR(3)	receive single message from the broker
+\fBpsmq_timedreceive\fR(3)	as above but return after timeout with no message
+\fBpsmq_timedreceive_ms\fR(3)	as above but accepts [ms] instead of timespec
+\fBpsmq_subscribe\fR(3)	subscribe to given topic to receive data
+\fBpsmq_unsubscribe\fR(3)	unsubscribe from topic to not receive that data
+.TE
+.SS PROGRAMS
+.PP
+.BR psmq-pub (1)
+This helper program allows to send multiple messages to specified broker
+directly from the command line.
+It is useful for debugging or sending messages from the scripts.
+.PP
+.BR psmq-sub (1)
+This helper program allows to receive multiple messages from specified broker
+directly from the command line.
+It is useful for debugging or as a traffic logger.
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

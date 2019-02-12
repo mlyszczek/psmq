@@ -8,7 +8,7 @@ AC_PROG_LIBTOOL
 LT_INIT
 AC_CANONICAL_HOST
 AC_CONFIG_FILES([Makefile www/Makefile lib/Makefile src/Makefile \
-                 tst/Makefile inc/Makefile])
+                 tst/Makefile inc/Makefile man/Makefile])
 AC_CONFIG_LINKS([tst/mtest.sh:tst/mtest.sh])
 AC_CHECK_HEADERS([linux/limits.h])
 

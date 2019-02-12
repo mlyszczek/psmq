@@ -1,0 +1,204 @@
+.TH "psmq_receive" "3" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.BR psmq_receive ,\  psmq_timedreceive ,\  psmq_timedreceive_ms
+- receive single message over
+.BR psmq.
+.SH SYNOPSIS
+.PP
+.BI "#include <psmq.h>"
+.PP
+.BI "int psmq_receive(struct psmq *" psmq ", psmq_sub_clbk " clbk ", \
+void *" userdata ")"
+.br
+.BI "int psmq_timedreceive(struct psmq *" psmq ", psmq_sub_clbk " clbk ", \
+void *" userdata ", struct timespec *" tp ")"
+.br
+.BI "int psmq_timedreceive_ms(struct psmq *" psmq ", psmq_sub_clbk " clbk ", \
+void *" userdata ", size_t " ms ")"
+.PP
+.BI "int (*" psmq_sub_clbk ")(char *" topic ", void *" payload ", \
+size_t " paylen ", unsigned int " prio ", void *" userdata ");
+.SH DESCRIPTION
+.PP
+Receive single message that client has subscribed to.
+Functions will block calling thread until message is received.
+.PP
+When message is received, function will call user provided function
+.I clbk
+with
+.I topic
+on which message has been sent,
+.I payload
+with data (which may be
+.B NULL
+if there is no data),
+.I paylen
+which is information about
+.I payload
+size in bytes and
+.I userdata
+pointer to data passed to
+.BR psmq_receive (3)
+which can be used to extrapolate data from message.
+After
+.I clbk
+return, pointers stored in
+.I topic
+and
+.I payload
+will point to undefined location and should not be used, if you need access
+to data outside of callback, copy them to location pointed by
+.IR userdata .
+.PP
+.BR psmq_timedreceive (3)
+works same way as
+.BR psmq_receive (3)
+but will block only until timeout
+.I tp
+occurs.
+Timeout is absolute time since Epoch when timeout should occur.
+If this function is called when timeout already occured
+.RI ( tp
+happens to be behind current time) and message is not available in queue,
+function will return immediately.
+.PP
+.BR psmq_timedreceive_ms (3)
+works same way as
+.BR psmq_timedreceive (3)
+but accepts relative timeout in form of
+.IR ms .
+If message is not received in
+.I ms
+time from the moment function is called, then the function will return.
+If
+.I ms
+is set to 0 and message is not on the queue, function will return immediately.
+.SH "RETURN VALUE"
+.PP
+When message is received then function will return whatever your
+.I clbk
+returns.
+On error -1 with appropriate errno set is returned.
+.SH ERRORS
+.TP
+.B EINVAL
+.I psmq
+or
+.I clbk
+is
+.BR NULL .
+.TP
+.B ENOTCONN
+.B psmq
+is connected to the broker, but receiving of the message has not yet been
+enabled.
+See
+.BR psmq_enable (3)
+for details.
+.TP
+.B EBADF
+Subscribe queue is invalid inside passed
+.I psmq
+object.
+It is possible that
+.I psmq
+has not yet been initialized, or
+.BR psmq_cleanup (3)
+has been called on it earlier, or
+.BR psmq_init (3)
+failed.
+.TP
+.B EINTR
+The call was interrupted by a signal handler.
+.PP
+.BR psmq_timedreceive (3)
+and
+.BR psmq_timedreceive_ms (3)
+can also return:
+.TP
+.B ETIMEDOUT
+The call timedout before a message could be transferred.
+.SH EXAMPLE
+.PP
+Example shows how to initialize, subscribe and receive data from psmq.
+Note: error checking has been ommited for clarity.
+.PP
+.nf
+    #include <psmq.h>
+    #include <stdio.h>
+
+    /* function that will be called upon message retrieval, here we
+     * just parse rpm value and store it in userdata pointer
+     */
+    static int can_engine_rpm_receiver(char *topic, void *payload,
+        size_t paylen, unsigned int prio, void *userdata)
+    {
+        memcpy(userdata, payload, sizeof(int));
+    }
+
+    int main(void)
+    {
+        struct psmq psmq;
+        int rpm;
+        int i;
+
+        /* initialize psmq object that will create /sub mqueue for
+         * receiving data, and will connect to broker of name /brok.
+         * Max items in queue is set to 10
+         */
+        psmq_init(&psmq, "/brok", "/sub", 10);
+
+        /* subscribe to receive revolution per minute information of
+         * engine
+         */
+        psmq_subscribe(&psmq, "/can/engine/rpm");
+
+        /* right now we are registered in broker and we did subscribe
+         * to topic, but we won't receive any messages until we enable
+         * client.  We do that now.
+         *
+         * We can disable client without unsubscribing and
+         * unregistering at anytime by calling the same function with
+         * second argument set to 0
+         */
+        psmq_enable(&psmq, 1);
+
+        for (i = 0; i != 10; ++i)
+        {
+            /* now receive data, this function will call our callback
+             * function with data. In this example we copy data to
+             * our rpm variable and print, but this could be done in
+             * callback function to avoid copying data
+             */
+            psmq_receive(&psmq, can_engine_rpm_receiver, &rpm);
+            printf("rpm %d\n", rpm);
+        }
+
+        /* after work is finished, we need to deregister from broker to
+         * make space in broker for another client
+         */
+        psmq_cleanup(&psmq);
+        return 0;
+    }
+.fi
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

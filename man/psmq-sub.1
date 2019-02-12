@@ -1,0 +1,101 @@
+.TH "psmq-sub" "1" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.B psmq-sub
+- helper tool to listen to subscribed messages over psmq.
+.SH SYNOPSIS
+.PP
+.B psmq-sub
+[
+.B -h
+|
+.B -v
+]
+.br
+.B psmq-sub
+.RB [< -n
+.IR mqueue-name >]
+.RB < -b
+.IR name >
+.RB < -t
+.IR topic >
+.RB [< -t
+.IR topic >]
+.RB [ -o
+.IR file ]
+.SH DESCRIPTION
+.TP
+.B -h
+Prints short help and exits
+.TP
+.B -v
+Prints version information and exits
+.TP
+.BI -n\  mqueue-name
+.B psmq-sub
+will create and use to communicate with broker.
+This argument is optional and by default
+.B /psmq-sub
+will be used.
+If you want to use custom
+.IR mqueue-name ,
+then this argument must be the first one you pass.
+.TP
+.BI -b\  name
+mqueue
+.I name
+of the broker you want to use for communication.
+This options is mandatory and must be passed after (if set)
+.B -n
+argument and before
+.BR -t .
+.TP
+.BI -t\  topic
+.I topic
+you want to subscribe to.
+At least one
+.I topic
+must be passed.
+You can subscribe to as many topics as you want by passing multiple
+.B -t
+options.
+.TP
+.BI -o\  path
+.I Path
+to a file, where logs from incoming messages shall be stored.
+If file cannot be opened, program will refuse to start.
+Optional argument, if not passed, messages will be printed to
+.BR stdout .
+.SH EXAMPLES
+.TP
+Listen to single topic
+.B psmq-sub
+-b/brok -t/topic1
+.TP
+Listen on multiple topics, use custom mqueue name
+.B psmq-sub
+-n/qsubnam -b/brok -t/topic1 -t/topic2/+ -t/topic3/subtopic2/*
+.TP
+Log every topic into file
+.B psmq-sub
+-b/brok -t/* -o/var/log/psmq-log
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

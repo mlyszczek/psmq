@@ -1,0 +1,108 @@
+.TH "psmqd" "1" "11 February 2019 (v0.1.0)" "bofc.pl"
+.SH NAME
+.PP
+.B psmqd
+- broker for publish subscribe over mqueue
+.SH SYNOPSIS
+.PP
+.B psmqd
+[
+.B -h
+|
+.B -v
+|
+.B options
+]
+.SH DESCRIPTION
+.PP
+.B psmqd
+is a broker that is responsible for handling clients and relaying messages to
+subscribed parties.
+No client can communicate with another without broker.
+Broker starts in foreground and doesn't daemonize on its own, to run it in
+background as demon, use external tool like
+.BR start-stop-daemon .
+.SH OPTIONS
+.PP
+.TP
+.B -h
+Prints short help and exits
+.TP
+.B -v
+Prints version information and exits
+.TP
+.B -c
+If set, ANSI colors will be added to logs depending on log level
+.TP
+.BI -l\  level
+Verbosity of logs.
+.I level
+can be on of:
+.EX
+    0   fatal errors, application cannot continue
+    1   major failure, needs immediate attention
+    2   critical errors
+    3   error but recoverable
+    4   warnings
+    5   normal message, but of high importance
+    6   info log, doesn't print that much (default)
+    7   debug, not needed in production
+.EE
+.TP
+.BI -p\  path
+Path to a file where logs from program will be stored.
+If not specified, or files does not exist or is not writale, logs will be
+printed to standard error output (stderr).
+.TP
+.BI -b\  name
+Name of the broker.
+This is effectively name of posix mq that will be used by clients to talk with
+the broker.
+Should start with one '/' (like "/name"), rest of the name is system specific.
+For example, QNX will accept name with multiple slashes (/multi/slash/path), but
+Linux will cry about it.
+Consult your system's manuall page (it's usually
+.BR mq_overview (7))
+If this is not specified, program will used default value
+.B /psmqd
+as mqueue name.
+.TP
+.B -r
+If previous instance of
+.B psmqd
+crashed or was killed with
+.B SIGKILL
+mqueue created by program will not be removed and will linger in the system.
+When you restart daemon after that, it will refuse to start because same
+mq already exists in the system.
+This is failsave to prevent two broker operate on single mqueue, which would
+lead to funny stuff.
+If you are sure it is safe to start broker, even though, mq with that name
+already exist, pass this flag, and broker will remove stalled mq prior to start.
+.TP
+.BI -m\  maxmsg
+Define maximum number of elements on the queue.
+This refers to control mqueue created by the broker, if you set this to small
+value, clients will hang in
+.BR mq_send ()
+until broker deals with incomig messages and free space in queue.
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_disable_threaded (3),
+.BR psmq_enable (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).
