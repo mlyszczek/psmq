@@ -214,7 +214,9 @@ int psmqd_cfg_init
     /* disable error printing from getopt library
      */
 
+#if PSMQ_NO_OPTERR == 0
     opterr = 0;
+#endif
 
     /* set g_psmqd_cfg object to well-known default state
      */
