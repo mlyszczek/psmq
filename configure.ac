@@ -29,6 +29,12 @@ CC="$PTHREAD_CC"
 AC_SEARCH_LIBS([el_init], [embedlog])
 AC_SEARCH_LIBS([mq_open], [rt])
 
+# POSIX mandates signals to be implemented *always*, but still there are
+# some super tiny unixes that decided not to implement them. Also, embedded,
+# remember? This is mainly for embedded which may not implement POSIX at all.
+# But if programs are build with autotools, we can be fairy sure it has signals.
+AC_DEFINE_UNQUOTED([PSMQ_NO_SIGNALS], [0], [Disable signals handling])
+
 ###
 # solaris has some serious design problem, since we enabled POSIX
 # >=200112, solaris will not let use c89 compiler even though we

@@ -29,10 +29,13 @@
 
 #include <embedlog.h>
 #include <errno.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#if PSMQ_NO_SIGNALS == 0
+#   include <signal.h>
+#endif
 
 #include "psmq.h"
 #include "psmq-common.h"
@@ -68,6 +71,7 @@ static int run;
     SIGINT and SIGTERM handles, sets run to 0, to stop app
    ========================================================================== */
 
+#if PSMQ_NO_SIGNALS == 0
 
 static void sigint_handler
 (
@@ -79,6 +83,7 @@ static void sigint_handler
     run = 0;
 }
 
+#endif
 
 /* ==========================================================================
     Callback called by psmq_receive with received data
@@ -136,8 +141,23 @@ int psmqs_main
     int               arg;     /* arg for getopt() */
     struct psmq       psmq;    /* psmq object */
     const char       *qname;   /* name of the client queue */
-    struct sigaction  sa;      /* signal action instructions */
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+#if PSMQ_NO_SIGNALS == 0
+    {
+        struct sigaction  sa;      /* signal action instructions */
+        /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+        /* install signal handler to nicely exit program
+         */
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = sigint_handler;
+        sigaction(SIGINT, &sa, NULL);
+        sigaction(SIGTERM, &sa, NULL);
+    }
+#endif
 
 
     el_oinit(&psmqs_log);
@@ -147,14 +167,6 @@ int psmqs_main
     el_ooption(&psmqs_out, EL_TS, EL_TS_LONG);
     el_ooption(&psmqs_out, EL_TS_TM, EL_TS_TM_REALTIME);
     el_ooption(&psmqs_out, EL_PRINT_LEVEL, 0);
-
-    /* install signal handler to nicely exit program
-     */
-
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = sigint_handler;
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
 
     run = 1;
     qname = "/psmq-sub";

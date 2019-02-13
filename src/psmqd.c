@@ -25,9 +25,12 @@
 
 #include <embedlog.h>
 #include <errno.h>
-#include <signal.h>
 #include <stdio.h>
 #include <string.h>
+
+#if PSMQ_NO_SIGNALS == 0
+#   include <signal.h>
+#endif
 
 #include "globals.h"
 #include "broker.h"
@@ -47,6 +50,7 @@
     Handler when SIGINT or SIGTERM are received by the program
    ========================================================================== */
 
+#if PSMQ_NO_SIGNALS == 0
 
 static void sigint_handler
 (
@@ -57,6 +61,8 @@ static void sigint_handler
 
     g_psmqd_shutdown = 1;
 }
+
+#endif
 
 
 /* ==========================================================================
@@ -79,9 +85,21 @@ int psmqd_main
     char             *argv[]   /* arguments from command line */
 )
 {
-    struct sigaction  sa;      /* signal action instructions */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+#if PSMQ_NO_SIGNALS == 0
+    {
+        struct sigaction  sa;      /* signal action instructions */
+        /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+
+        /* install signal handler to nicely exit program
+         */
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = sigint_handler;
+        sigaction(SIGINT, &sa, NULL);
+        sigaction(SIGTERM, &sa, NULL);
+    }
+#endif
 
     g_psmqd_shutdown = 0;
 
@@ -124,14 +142,6 @@ int psmqd_main
             el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_STDERR);
         }
     }
-
-    /* install signal handler to nicely exit program
-     */
-
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = sigint_handler;
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
 
     psmqd_cfg_print();
 

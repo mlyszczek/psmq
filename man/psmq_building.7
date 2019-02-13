@@ -123,6 +123,13 @@ If you set
 to, let's say 20, and you are sending message with payload that takes only 2
 byte, then 20 bytes will get copied anyway.
 Same rule applies to topics.
+.TP
+.BR PSMQ_NO_SIGNALS\  (bool)
+Signals were implemented mainly for full-fledged UNIXes, but many embedded
+simply does not implement signals. If you want to use
+.B psmq
+on such system, define this to 1. It is not possible to set this when building
+with autotools. C'mon, if you can use autotools you surely have signals.
 .SH DEPENDENCIES
 .PP
 Broker needs
