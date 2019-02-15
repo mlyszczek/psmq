@@ -123,6 +123,12 @@ If you set
 to, let's say 20, and you are sending message with payload that takes only 2
 byte, then 20 bytes will get copied anyway.
 Same rule applies to topics.
+.PP
+Broker will create single mqueue with with mq_size set to
+.B sizeof(struct psmq_msg_pub)
+and each client will create single mqueue with mq size set to
+.BR sizeof(struct psmq_msg) .
+Both of these values are printed during broker startup.
 .TP
 .BR PSMQ_NO_SIGNALS\  (bool)
 Signals were implemented mainly for full-fledged UNIXes, but many embedded

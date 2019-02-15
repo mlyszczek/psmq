@@ -256,7 +256,7 @@ void psmqd_cfg_print(void)
 #define PSMQ_MSG_PUB_TOPIC size_of_member(struct psmq_msg_pub, topic)
 #define PSMQ_MSG_PUB_PAYLOAD size_of_member(struct psmq_msg_pub, payload)
 
-    char padder[] = "....................:";
+    char padder[] = "............................:";
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -275,6 +275,8 @@ void psmqd_cfg_print(void)
     CONFIG_PRINT_VAR(PSMQ_MSG_PAYLOAD, "%d");
     CONFIG_PRINT_VAR(PSMQ_MSG_PUB_TOPIC, "%d");
     CONFIG_PRINT_VAR(PSMQ_MSG_PUB_PAYLOAD, "%d");
+    CONFIG_PRINT_VAR(sizeof(struct psmq_msg), "%lu");
+    CONFIG_PRINT_VAR(sizeof(struct psmq_msg_pub), "%lu");
 
 #undef CONFIG_PRINT
 }
