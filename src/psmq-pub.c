@@ -190,7 +190,7 @@ static void send_stdin
 #if PSMQ_STANDALONE
 int main
 #else
-int psmqp_main
+int psmq_pub_main
 #endif
 (
     int          argc,         /* number of arguments in argv */

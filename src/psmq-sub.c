@@ -131,7 +131,7 @@ static int on_receive
 #if PSMQ_STANDALONE
 int main
 #else
-int psmqs_main
+int psmq_sub_main
 #endif
 (
     int               argc,    /* number of arguments in argv */
