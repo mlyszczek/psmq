@@ -200,16 +200,19 @@ static int psmqd_broker_topic_matches
              * so we can stop parsing now and treat topics as
              * matching.
              *
+             * Note, '*' was replaces with '@' to make compilers happy.
+             * A little quiz, guess why?
+             *
              * Examples of matching topics:
              *
              *      pub: /a/b/c/d
-             *      sub: /a/b/*
+             *      sub: /a/b/@
              *
              *      pub: /a/b/c/d
-             *      sub: /a/*
+             *      sub: /a/@
              *
              *      pub: /a/b/c/d
-             *      sub: /*
+             *      sub: /@
              */
 
             return 1;
