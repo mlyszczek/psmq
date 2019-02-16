@@ -1,0 +1,26 @@
+Source: psmq
+Section: embedded
+Priority: optional
+Maintainer: Michał Łyszczek <michal.lyszczek@bofc.pl>
+Build-Depends: embedlog (>=0.4.0), debhelper (>=10), autotools-dev, dh-autoreconf
+Standards-Version: 3.9.8
+Vcs-Git: https://git.kurwinet.pl/psmq
+Vcs-browser: https://git.kurwinet.pl/psmq
+Homepage: https://psmq.kurwinet.pl
+
+Package: psmq
+Section: embedded
+Pre-Depends: ${misc:Pre-Depends}
+Architecture: any
+Depends: embedlog (>=0.4.0), ${shlibs:Depends}, ${misc:Depends}
+Description: psmq is publish ssubscribe message queue. It's a set of
+ programs and libraries to implement publish/subscribe way of inter process
+ communication on top of POSIX message queue
+
+Package: psmq-dev
+Section: embedded
+Depends: psmq (= ${binary:Version}), ${misc:Depends}
+Architecture: any
+Description: psmq is publish ssubscribe message queue. It's a set of
+ programs and libraries to implement publish/subscribe way of inter process
+ communication on top of POSIX message queue

@@ -1,0 +1,5 @@
+usr/lib/*/libpsmq.so
+usr/include/psmq.h
+usr/share/man/man1/*
+usr/share/man/man3/*
+usr/share/man/man7/*

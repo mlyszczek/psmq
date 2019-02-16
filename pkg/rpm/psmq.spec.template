@@ -1,0 +1,69 @@
+Name:           psmq
+Version:        @{VERSION}
+Release:        1
+Summary:        publish subscribe ipc on top of  message queue
+
+Group:          System Environment/Libraries
+License:        BSD
+URL:            https://psmq.kurwinet.pl
+Source0:        https://git.kurwinet.pl/psmq/snapshot/psmq-%{version}.tar.gz
+Vendor:         Bits of Code
+Packager:       Michał Łyszczek <michal.lyszczek@bofc.pl>
+
+BuildRequires:  embedlog >= 0.4.0, automake autoconf libtool
+Requires:       embedlog >= 0.4.0
+
+%description
+psmq is publish ssubscribe message queue. It's a set of programs and libraries
+to implement publish/subscribe way of inter process communication on top of
+POSIX message queue
+
+%package devel
+Summary:        psmq development package
+Group:          Development/Libraries
+Requires:       %{name} = %{version}-%{release}
+
+%description devel
+psmq development package containing headers and manuals
+
+%prep
+%setup -q -n psmq-@{GIT_VERSION}
+
+# debug packge macro, it is commented by default as rhel and centos
+# automatically build debug package, but open suse does not. Change it to
+# "@debug_package" (just change that @ to percent %% character)
+# when debug symbols are not automatically installed
+
+# __DEBUG_PACKAGE__
+
+%build
+./autogen.sh
+%configure
+make %{?_smp_mflags}
+
+%install
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
+make DESTDIR=$RPM_BUILD_ROOT install
+
+%clean
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
+
+%post -p /sbin/ldconfig
+%postun -p /sbin/ldconfig
+
+%files
+%defattr(-,root,root,-)
+%doc AUTHORS LICENSE readme.md
+%{_libdir}/libpsmq.so.@{ABI_VERSION}
+%{_libdir}/libpsmq.so.@{LIB_VERSION}
+%{_bindir}/*
+
+%files devel
+%defattr(-,root,root,-)
+%{_includedir}/psmq.h
+%{_libdir}/libpsmq.so
+%{_libdir}/libpsmq.a
+%{_libdir}/libpsmq.la
+%{_mandir}/*/*
+
+%changelog

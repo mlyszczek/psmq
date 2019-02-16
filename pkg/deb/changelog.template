@@ -1,0 +1,5 @@
+libpsmq (@{VERSION}) @{CODENAME}; urgency=low
+
+    * psmq package
+
+ -- Michał Łyszczek <michal.lyszczek@bofc.pl>  @{DATE}
