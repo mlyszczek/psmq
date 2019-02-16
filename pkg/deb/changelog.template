@@ -1,4 +1,4 @@
-libpsmq (@{VERSION}) @{CODENAME}; urgency=low
+psmq (@{VERSION}) @{CODENAME}; urgency=low
 
     * psmq package
 

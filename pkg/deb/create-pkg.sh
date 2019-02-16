@@ -2,6 +2,23 @@
 
 scp_server="pkgs@kurwik"
 project="psmq"
+retval=1
+
+atexit()
+{
+    set +e
+
+    # removed installed deps
+    apt-get purge -y libembedlog0
+    apt-get purge -y libembedlog-dev
+
+    # remove testing program
+    apt-get purge -y "${project}"
+    apt-get purge -y "lib${project}${abi_version}"
+    apt-get purge -y "lib${project}-dev"
+
+    exit ${retval}
+}
 
 if [ ${#} -ne 3 ]
 then
@@ -21,6 +38,9 @@ version="${1}"
 arch="${2}"
 host_os="${3}"
 
+trap atexit EXIT
+set -e
+
 ###
 # preparing
 #
@@ -32,7 +52,7 @@ cd "/tmp/${project}-${version}"
 git clone "https://git.kurwinet.pl/${project}"
 cd "${project}"
 
-git checkout "${version}" || exit 1
+git checkout "${version}"
 
 if [ ! -d "pkg/deb" ]
 then
@@ -41,15 +61,19 @@ then
 fi
 
 version="$(grep "AC_INIT(" "configure.ac" | cut -f3 -d\[ | cut -f1 -d\])"
-abi_version="$(echo ${version} | cut -f1 -d.)"
-
 echo "version ${version}"
+abi_version="$(echo ${version} | cut -f1 -d.)"
 echo "abi version ${abi_version}"
 
 ###
 # building package
 #
 
+###
+# install build dependencies
+#
+
+apt-get install -y libembedlog0 libembedlog-dev
 codename="$(lsb_release -c | awk '{print $2}')"
 
 cp -r "pkg/deb/" "debian"
@@ -61,11 +85,14 @@ sed -i "s/@{ABI_VERSION}/${abi_version}/" "debian/control.template"
 mv "debian/changelog.template" "debian/changelog"
 mv "debian/control.template" "debian/control"
 
-export CFLAGS="-I/usr/bofc/include -g"
-export LDFLAGS="-L/usr/bofc/lib"
-debuild -us -uc || exit 1
+export CFLAGS="-g"
+#export LDFLAGS="-L/usr/bofc/lib"
+debuild -us -uc
 
+###
 # unsed, so it these don't pollute gcc, when we built test program
+#
+
 unset CFLAGS
 unset LDFLAGS
 
@@ -75,20 +102,22 @@ unset LDFLAGS
 
 cd ..
 
+###
 # debuild doesn't fail when lintial finds an error, so we need
 # to check it manually, it doesn't take much time, so whatever
+#
 
 for d in *.deb
 do
     echo "Running lintian on ${d}"
-    lintian ${d} || exit 1
+    lintian ${d}
 done
 
-dpkg -i "lib${project}${abi_version}_${version}_${arch}.deb" || exit 1
-dpkg -i "lib${project}-dev_${version}_${arch}.deb" || exit 1
+dpkg -i "lib${project}${abi_version}_${version}_${arch}.deb"
+dpkg -i "${project}_${version}_${arch}.deb"
+dpkg -i "lib${project}-dev_${version}_${arch}.deb"
 
-failed=0
-gcc ${project}/pkg/test.c -o testprog -lpsmq || failed=1
+gcc ${project}/pkg/test.c -o testprog -lpsmq
 
 if ldd ./testprog | grep "\/usr\/bofc"
 then
@@ -98,41 +127,65 @@ then
 
     echo "test prog uses libs from manually installed /usr/bofc \
         instead of system path!"
-    failed=1
+    exit 1
 fi
 
-./testprog || failed=1
+./testprog
 
-dpkg -r "lib${project}${abi_version}" "lib${project}-dev" || exit 1
+psmqd -v
+psmq-sub -v
+psmq-pub -v
+
+dpkg -r "lib${project}-dev"
+dpkg -r "${project}"
+dpkg -r "lib${project}${abi_version}"
 
 # run test prog again, but now fail if there is no error, testprog
 # should fail as there is no library in te system any more
+set +e
+failed=0
 ./testprog && failed=1
+psmqd -v && failed=1
+psmq-sub -v && failed=1
+psmq-pub -v && failed=1
 
 if [ ${failed} -eq 1 ]
 then
     exit 1
 fi
+set -e
 
 if [ -n "${scp_server}" ]
 then
-    dbgsym_pkg="lib${project}${abi_version}-dbgsym_${version}_${arch}.deb"
+    lib_dbgsym_pkg="lib${project}${abi_version}-dbgsym_${version}_${arch}.deb"
+    bin_dbgsym_pkg="${project}-dbgsym_${version}_${arch}.deb"
 
-    if [ ! -f "${dbgsym_pkg}" ]
+    if [ ! -f "${lib_dbgsym_pkg}" ]
     then
         # on some systems packages with debug symbols are created with
         # ddeb extension and not deb
-        dbgsym_pkg="lib${project}${abi_version}-dbgsym_${version}_${arch}.ddeb"
+        lib_dbgsym_pkg="lib${project}${abi_version}-dbgsym_${version}_${arch}.ddeb"
+    fi
+
+    if [ ! -f "${bin_dbgsym_pkg}" ]
+    then
+        # on some systems packages with debug symbols are created with
+        # ddeb extension and not deb
+        bin_dbgsym_pkg="${project}-dbgsym_${version}_${arch}.ddeb"
     fi
 
     echo "copying data to ${scp_server}:${project}/${host_os}/${arch}"
-    scp "lib${project}-dev_${version}_${arch}.deb" \
-        "${dbgsym_pkg}" \
+    scp "${lib_dbgsym_pkg}" \
+        "${bin_dbgsym_pkg}" \
+        "lib${project}-dev_${version}_${arch}.deb" \
         "lib${project}${abi_version}_${version}_${arch}.deb" \
-        "lib${project}_${version}.dsc" \
-        "lib${project}_${version}.tar.xz" \
-        "lib${project}_${version}_${arch}.build" \
-        "lib${project}_${version}_${arch}.buildinfo" \
-        "lib${project}_${version}_${arch}.changes" \
+        "${project}_${version}_${arch}.deb" \
+        "${project}_${version}.dsc" \
+        "${project}_${version}.tar.xz" \
+        "${project}_${version}_${arch}.build" \
+        "${project}_${version}_${arch}.buildinfo" \
+        "${project}_${version}_${arch}.changes" \
         "${scp_server}:${project}/${host_os}/${arch}" || exit 1
 fi
+
+retval=0

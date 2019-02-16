@@ -49,7 +49,7 @@ failed=0
 gcc "${workdir}/${project}-${git_version}/pkg/test.c" -o "${workdir}/testprog" \
     -lpsmq || failed=1
 
-if ldd "${workdir}/testprog" | grep "\/usr\/bofc"
+if ldd "${workdir}/testprog" | grep "libpsmq" | grep "\/usr\/bofc"
 then
     # sanity check to make sure test program uses system libraries
     # and not locally installed ones (which are used as build
@@ -61,12 +61,18 @@ then
 fi
 
 "${workdir}/testprog" || failed=1
+psmqd -v || failed=1
+psmq-pub -v || failed=1
+psmq-sub -v || failed=1
 
 removepkg "${project}"
 
 # run test prog again, but now fail if there is no error, testprog
 # should fail as there is no library in te system any more
 "${workdir}/testprog" && failed=1
+psmqd -v && failed=1
+psmq-pub -v && failed=1
+psmq-sub -v && failed=1
 
 if [ ${failed} -eq 1 ]
 then

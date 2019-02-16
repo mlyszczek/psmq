@@ -1,2 +1,3 @@
-usr/lib/*/libpsmq.so.*
 usr/bin/*
+usr/share/man/man1/*
+usr/share/man/man7/*

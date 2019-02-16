@@ -2,6 +2,29 @@
 
 project="psmq"
 scp_server="pkgs@kurwik"
+retval=1
+
+atexit()
+{
+    set +e
+
+    if type zypper >/dev/null
+    then
+        zypper remove -y embedlog-devel
+        zypper remove -y embedlog
+
+        zypper remove -y "${project}"
+        zypper remove -y "${project}-devel"
+    else
+        yum remove -y embedlog-devel
+        yum remove -y embedlog
+
+        yum remove -y "${project}"
+        yum remove -y "${project}-devel"
+    fi
+
+    exit ${retval}
+}
 
 if [ ${#} -ne 3 ]
 then
@@ -18,6 +41,9 @@ git_version="${1}"
 arch="${2}"
 host_os="${3}"
 
+trap atexit EXIT
+set -e
+
 cd "${HOME}/rpmbuild"
 pkg_version="$(curl "https://git.kurwinet.pl/${project}/plain/configure.ac?h=${git_version}" | \
     grep "AC_INIT(" | cut -f3 -d\[ | cut -f1 -d\])"
@@ -25,7 +51,7 @@ wget "https://git.kurwinet.pl/${project}/snapshot/${project}-${git_version}.tar.
     -O "SOURCES/${project}-${pkg_version}.tar.gz"
 wget "https://git.kurwinet.pl/${project}/plain/pkg/rpm/${project}.spec.template?h=${git_version}" \
     -O "SPECS/${project}-${pkg_version}.spec"
-lt_version="$(curl "https://git.kurwinet.pl/${project}/plain/src/Makefile.am?h=${git_version}" | \
+lt_version="$(curl "https://git.kurwinet.pl/${project}/plain/lib/Makefile.am?h=${git_version}" | \
     grep "${project}_la_LDFLAGS = -version-info" | cut -f4 -d\ )"
 
 current="$(echo ${lt_version} | cut -f1 -d:)"
@@ -42,6 +68,13 @@ sed -i "s/@{GIT_VERSION}/${git_version}/" SPECS/${project}-${pkg_version}.spec
 sed -i "s/@{LIB_VERSION}/${lib_version}/" SPECS/${project}-${pkg_version}.spec
 sed -i "s/@{ABI_VERSION}/${abi_version}/" SPECS/${project}-${pkg_version}.spec
 
+# install deps
+if type zypper >/dev/null
+then
+    zypper install -y embedlog embedlog-devel
+else
+    yum install -y embedlog embedlog-devel
+fi
 
 if cat /etc/os-release | grep "openSUSE Leap"
 then
@@ -51,7 +84,7 @@ then
         SPECS/${project}-${pkg_version}.spec
 fi
 
-rpmbuild -ba SPECS/${project}-${pkg_version}.spec || exit 1
+rpmbuild -ba SPECS/${project}-${pkg_version}.spec
 
 ###
 # verify
@@ -87,6 +120,9 @@ then
 fi
 
 /tmp/${project}-test || failed=1
+psmqd -v
+psmq-pub -v
+psmq-sub -v
 
 if type zypper >/dev/null
 then
@@ -97,12 +133,18 @@ fi
 
 # run test prog again, but now fail if there is no error, testprog
 # should fail as there is no library in te system any more
+set +e
+failed=0
 /tmp/${project}-test && failed=1
+psmqd -v && failed=1
+psmq-pub -v && failed=1
+psmq-sub -v && failed=1
 
 if [ ${failed} -eq 1 ]
 then
     exit 1
 fi
+set -e
 
 if [ -n "${scp_server}" ]
 then
@@ -112,3 +154,5 @@ then
         "RPMS/${arch}/${project}-debuginfo-${pkg_version}-${rel_version}.${arch}.rpm" \
         "${scp_server}:${project}/${host_os}/${arch}" || exit 1
 fi
+
+retval=0

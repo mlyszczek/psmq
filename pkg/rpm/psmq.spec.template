@@ -44,6 +44,16 @@ make %{?_smp_mflags}
 %install
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.a
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.la
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.so
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.so.0
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.so.0.1.0
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.a
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.la
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.so
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.so.0
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.so.0.1.0
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
