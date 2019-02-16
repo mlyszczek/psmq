@@ -423,7 +423,13 @@ psmq_pub_from_stdin_too_long_line()
 }
 psmq_pub_from_stdin_too_long_topic()
 {
-    topic="/$(randstr ${psmq_msg_payload_len} )"
+    topic_len=${psmq_msg_payload_len}
+    if [ ${psmq_msg_topic_len} -gt ${psmq_msg_payload_len} ]
+    then
+        topic_len=${psmq_msg_pub_topic_len}
+    fi
+    topic_len=$((topic_len + 1))
+    topic="/$(randstr ${topic_len} )"
     echo "msg" | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t${topic} 2> \
         ${psmqp_stderr}
     mt_fail "psmq_grep \"f/topic is too long\" \

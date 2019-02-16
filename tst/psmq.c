@@ -146,7 +146,7 @@ static void psmq_initialize_queue_not_exist(void)
 
 static void psmq_initialize_queue_too_long(void)
 {
-    char         qname[PSMQ_PAYLOAD_MAX + 10];
+    char         qname[size_of_member(struct psmq_msg_pub, payload) + 10];
     struct psmq  psmq;
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
