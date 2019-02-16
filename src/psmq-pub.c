@@ -230,7 +230,7 @@ int psmq_pub_main
             printf("%s v"PACKAGE_VERSION"\n"
                 "by Michał Łyszczek <michal.lyszczek@bofc.pl>\n", argv[0]);
 
-            return 1;
+            return 0;
 
         case 'h':
             printf(
@@ -253,7 +253,7 @@ int psmq_pub_main
 "When message is read from stdin, program will send each line as separate\n"
 "message on passed topic until EOF is encoutered\n");
 
-            return 1;
+            return 0;
 
         case ':':
             fprintf(stderr, "f/option -%c requires an argument\n", optopt);

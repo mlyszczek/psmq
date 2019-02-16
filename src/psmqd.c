@@ -103,8 +103,25 @@ int psmqd_main
 
     g_psmqd_shutdown = 0;
 
-    if (psmqd_cfg_init(argc, argv) != 0)
+    switch (psmqd_cfg_init(argc, argv))
     {
+    case 0:
+        /* no errors in parsing arguments, continue program execution
+         */
+
+        break;
+
+    case -2:
+    case -3:
+        /* help or version was printed, exit program without error
+         */
+
+        return 0;
+
+    default:
+        /* error occured when parsing arguments, die
+         */
+
         return 1;
     }
 

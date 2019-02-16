@@ -257,7 +257,7 @@ int psmq_sub_main
         case 'v':
             printf("%s v"PACKAGE_VERSION"\n"
                 "by Michał Łyszczek <michal.lyszczek@bofc.pl>\n", argv[0]);
-            return 1;
+            return 0;
 
         case 'h':
             printf(
@@ -276,7 +276,7 @@ int psmq_sub_main
 "\t-t <topic>           topic to subscribe to, can be used multiple times\n"
 "\t-o <file>            file where to store logs from incoming messages\n"
 "\t                     if not set, stdout will be used\n");
-            return 1;
+            return 0;
 
         case ':':
             el_oprint(OELF, "option -%c requires an argument", optopt);
