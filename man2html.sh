@@ -70,7 +70,7 @@ do
     # it as h1
     sed -i 's/H2>/H1>/g' "${ftmp}"
 
-    # convert all h3 into h2 headings, man2html generates .SS as h2 and we want
+    # convert all h3 into h2 headings, man2html generates .SS as h3 and we want
     # it as h2
     sed -i 's/H3>/H2>/g' "${ftmp}"
 
