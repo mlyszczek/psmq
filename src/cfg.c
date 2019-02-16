@@ -170,7 +170,7 @@ static int cfg_parse_args
             return -2;
 
         case 'v':
-            printf(PACKAGE_STRING"\n"
+            printf("psmqd "PACKAGE_VERSION"\n"
                 "by Michał Łyszczek <michal.lyszczek@bofc.pl>\n");
 
             return -3;
