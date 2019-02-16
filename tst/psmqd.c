@@ -833,7 +833,7 @@ static void psmqd_multi_pub_sub(void *arg)
     qpub = malloc(args->num_pub * sizeof(char *));
     for (i = 0; i != args->num_pub; ++i)
     {
-        qpub[i] = malloc(QNAME_LEN);
+        qpub[i] = (char *)malloc(sizeof(char) * QNAME_LEN);
         psmqt_gen_queue_name(qpub[i], QNAME_LEN);
         mt_fok(psmq_init(&psmq_pub[i], gt_broker_name, qpub[i], 10));
     }
@@ -842,7 +842,7 @@ static void psmqd_multi_pub_sub(void *arg)
     qsub = malloc(args->num_sub * sizeof(char *));
     for (i = 0; i != args->num_sub; ++i)
     {
-        qsub[i] = malloc(QNAME_LEN);
+        qsub[i] = malloc(sizeof(char) * QNAME_LEN);
         psmqt_gen_queue_name(qsub[i], QNAME_LEN);
         mt_fok(psmq_init(&psmq_sub[i], gt_broker_name, qsub[i], 10));
     }
