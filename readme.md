@@ -76,6 +76,7 @@ architectures. No exceptions.
 operating system tests
 ----------------------
 
+* arm-cortex-m3-nuttx-7.28 (manual) ![test-result-svg][fsan]
 * power4-polarhome-aix-7.1 ![test-result-svg][p4aix]
 * i686-builder-freebsd-11.1 ![test-result-svg][x32fb]
 * i686-builder-netbsd-8.0 ![test-result-svg][x32nb]
