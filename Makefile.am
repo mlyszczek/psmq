@@ -14,7 +14,7 @@ analyze:
 	make analyze -C tst
 
 www:
-#	./gen-download-page.sh
+	./gen-download-page.sh
 	./man2html.sh
 	make www -C www
 
