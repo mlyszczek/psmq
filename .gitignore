@@ -25,7 +25,10 @@
 /libtool
 /ltmain.sh
 /missing
+/psmq-*
 /psmq-*.tar.*
+/psmq-config.h
+/psmq-config.h.in
 /psmqd.log
 /stamp-h1
 /test-driver
