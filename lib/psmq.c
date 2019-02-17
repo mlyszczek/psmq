@@ -203,7 +203,7 @@ static int psmq_un_subscribe
     int           sub       /* subscribe - 1 or unsubsribe - 0 */
 )
 {
-    char          topicfd[PSMQ_TOPIC_WITH_FD]; /* topic with fd info */
+    char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
     int           ack;      /* response from the broker */
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -603,7 +603,7 @@ int psmq_cleanup
     struct psmq  *psmq  /* psmq object to cleanup */
 )
 {
-    char          topicfd[PSMQ_TOPIC_WITH_FD]; /* topic with fd info */
+    char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -678,7 +678,7 @@ int psmq_enable
     int           enable  /* enable or disable client */
 )
 {
-    char          topicfd[PSMQ_TOPIC_WITH_FD]; /* topic with fd info */
+    char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
     int           ack;    /* response from the broker */
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -742,7 +742,7 @@ int psmq_disable_threaded
     struct psmq  *psmq   /* psmq object */
 )
 {
-    char          topicfd[PSMQ_TOPIC_WITH_FD]; /* topic with fd info */
+    char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
