@@ -107,6 +107,12 @@ That includes first \'/\' character, but does not include terminating null
 character.
 So if this is set to 3, then topics "/0", "/01" will be valid, but "/012" will
 be too long.
+To avoid unnecessary padding, set this value to round value minus one, that is
+15 instead of 16, or 127 instead of 128.
+It's because
+.B psmq
+adds +1 for string termination character, so if you set this to 16, array size
+will be effectively 17 and that may lead to padding.
 .TP
 .BR PSMQ_PAYLOAD_MAX\  (int)
 Defines maximum size of payload that can be sent via
