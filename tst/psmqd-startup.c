@@ -250,7 +250,8 @@ void psmqt_gen_random_string
 
 /* ==========================================================================
     Generates random mqueue name, usefull when running multiple tests on one
-    machine. Name will be generated with leading '/' character.
+    machine. Name will be generated with leading '/' character.  Won't
+    generate name longer 32 chars
    ========================================================================== */
 
 
@@ -261,6 +262,11 @@ char * psmqt_gen_queue_name
 )
 {
     s[0] = '/';
+
+    /* limit length of queue name
+     */
+
+    l = l > 32 ? 32 : l;
 
     /* generate unique queue name until it is different than
      * gt_broker_name to prevent name clash
