@@ -6,7 +6,8 @@ if HAVE_GCOV
 clean-local: clean-gcov
 endif
 
-EXTRA_DIST = tap-driver.sh psmq-common.h readme.md man2html.sh
+EXTRA_DIST = tap-driver.sh psmq-common.h readme.md man2html.sh \
+	gen-download-page.sh
 
 analyze:
 	make analyze -C src
