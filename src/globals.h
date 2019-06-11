@@ -10,7 +10,7 @@
 #include "cfg.h"
 
 extern struct psmqd_cfg   g_psmqd_cfg;
-extern struct el_options  g_psmqd_log;
+extern struct el          g_psmqd_log;
 extern int                g_psmqd_shutdown;
 
 #endif /* PSMQ_GLOBALS_H */

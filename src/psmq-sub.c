@@ -52,8 +52,8 @@
 
 
 #define EL_OPTIONS_OBJECT &psmqs_log
-static struct el_options psmqs_log;
-static struct el_options psmqs_out;
+static struct el psmqs_log;
+static struct el psmqs_out;
 static int run;
 
 
