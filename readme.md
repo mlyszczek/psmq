@@ -64,7 +64,10 @@ Dependencies
 All code follows **ANSI C** and **POSIX** standard (version 200112).
 External dependencies are:
 
-* [>=embedlog-0.4](https://embedlog.kurwinet.pl)
+* [>=embedlog-0.5](https://embedlog.kurwinet.pl)
+
+**psmq-0.1.0** requires
+* [=embedlog-0.4](https://embedlog.kurwinet.pl)
 
 Test results
 ============
