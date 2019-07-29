@@ -777,7 +777,6 @@ static int psmqd_broker_publish
     el_oprint(OELD, "received publish from topic %s, payload:", msg->topic);
     el_opmemory(OELD, msg->payload, msg->paylen);
 
-    VALIDOP(E2BIG, strlen(msg->topic) <= sizeof(msg->topic));
     VALIDOP(E2BIG, msg->paylen <= sizeof(msg->payload));
     VALIDOP(ENOBUFS,
         strlen(msg->topic) < size_of_member(struct psmq_msg, topic));
