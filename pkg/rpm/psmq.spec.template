@@ -5,8 +5,8 @@ Summary:        publish subscribe ipc on top of  message queue
 
 Group:          System Environment/Libraries
 License:        BSD
-URL:            https://psmq.kurwinet.pl
-Source0:        https://git.kurwinet.pl/psmq/snapshot/psmq-%{version}.tar.gz
+URL:            https://psmq.bofc.pl
+Source0:        https://git.bofc.pl/psmq/snapshot/psmq-%{version}.tar.gz
 Vendor:         Bits of Code
 Packager:       Michał Łyszczek <michal.lyszczek@bofc.pl>
 

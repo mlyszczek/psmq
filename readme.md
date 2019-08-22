@@ -44,19 +44,19 @@ Documentation
 =============
 
 For detailed information about using broker and library, check out
-[man pages](https://psmq.kurwinet.pl/manuals.html).
+[man pages](https://psmq.bofc.pl/manuals.html).
 
 Examples
 ========
 
 Example of receiving message is in
-[psmq_receive](https://psmq.kurwinet.pl/manuals/psmq_receive.3.html)(3) manual
+[psmq_receive](https://psmq.bofc.pl/manuals/psmq_receive.3.html)(3) manual
 page, and example of publishing message is in
-[psmq_publish](https://psmq.kurwinet.pl/manuals/psmq_publish.3.html)(3) manual
+[psmq_publish](https://psmq.bofc.pl/manuals/psmq_publish.3.html)(3) manual
 page.
 
-You can also study [psmq-pub](https://git.kurwinet.pl/psmq/tree/src/psmq-pub.c)
-and [psmq-sub](https://git.kurwinet.pl/psmq/tree/src/psmq-sub.c) source code.
+You can also study [psmq-pub](https://git.bofc.pl/psmq/tree/src/psmq-pub.c)
+and [psmq-sub](https://git.bofc.pl/psmq/tree/src/psmq-sub.c) source code.
 
 Dependencies
 ============
@@ -64,10 +64,10 @@ Dependencies
 All code follows **ANSI C** and **POSIX** standard (version 200112).
 External dependencies are:
 
-* [>=embedlog-0.5](https://embedlog.kurwinet.pl)
+* [>=embedlog-0.5](https://embedlog.bofc.pl)
 
 **psmq-0.1.0** requires
-* [=embedlog-0.4](https://embedlog.kurwinet.pl)
+* [=embedlog-0.4](https://embedlog.bofc.pl)
 
 Test results
 ============
@@ -117,7 +117,7 @@ Compiling and installing
 ========================
 
 Instruction on how to compile, install and integrate are in
-[psmq_building](https://psmq.kurwinet.pl/manuals/psmq_building.7.html) manual
+[psmq_building](https://psmq.bofc.pl/manuals/psmq_building.7.html) manual
 page.
 
 Contact
@@ -129,38 +129,38 @@ License
 =======
 
 Library is licensed under BSD 2-clause license. See
-[LICENSE](http://git.kurwinet.pl/psmq/tree/LICENSE) file for details
+[LICENSE](http://git.bofc.pl/psmq/tree/LICENSE) file for details
 
 See also
 ========
 
-* [mtest](http://mtest.kurwinet.pl) unit test framework **psmq** uses
-* [git repository](http://git.kurwinet.pl/psmq) to browse code online
-* [continous integration](http://ci.psmq.kurwinet.pl) for project
+* [mtest](http://mtest.bofc.pl) unit test framework **psmq** uses
+* [git repository](http://git.bofc.pl/psmq) to browse code online
+* [continous integration](http://ci.psmq.bofc.pl) for project
 * [polarhome](http://www.polarhome.com) nearly free shell accounts for
   virtually any unix there is.
 
-[a64lg]: http://ci.psmq.kurwinet.pl/badges/aarch64-builder-linux-gnu-tests.svg
-[armv5]: http://ci.psmq.kurwinet.pl/badges/armv5te926-builder-linux-gnueabihf-tests.svg
-[armv6]: http://ci.psmq.kurwinet.pl/badges/armv6j1136-builder-linux-gnueabihf-tests.svg
-[armv7a15]: http://ci.psmq.kurwinet.pl/badges/armv7a15-builder-linux-gnueabihf-tests.svg
-[armv7a9]: http://ci.psmq.kurwinet.pl/badges/armv7a9-builder-linux-gnueabihf-tests.svg
-[x32fb]: http://ci.psmq.kurwinet.pl/badges/i686-builder-freebsd-tests.svg
-[x32lg]: http://ci.psmq.kurwinet.pl/badges/i686-builder-linux-gnu-tests.svg
-[x32lm]: http://ci.psmq.kurwinet.pl/badges/i686-builder-linux-musl-tests.svg
-[x32lu]: http://ci.psmq.kurwinet.pl/badges/i686-builder-linux-uclibc-tests.svg
-[x32nb]: http://ci.psmq.kurwinet.pl/badges/i686-builder-netbsd-tests.svg
-[m32lg]: http://ci.psmq.kurwinet.pl/badges/mips-builder-linux-gnu-tests.svg
-[x64lg]: http://ci.psmq.kurwinet.pl/badges/x86_64-builder-linux-gnu-tests.svg
-[x64lm]: http://ci.psmq.kurwinet.pl/badges/x86_64-builder-linux-musl-tests.svg
-[x64lu]: http://ci.psmq.kurwinet.pl/badges/x86_64-builder-linux-uclibc-tests.svg
-[x64ss]: http://ci.psmq.kurwinet.pl/badges/x86_64-builder-solaris-tests.svg
-[p4aix]: http://ci.psmq.kurwinet.pl/badges/power4-polarhome-aix-tests.svg
-[x64debian9]: http://ci.psmq.kurwinet.pl/badges/x86_64-debian-9-tests.svg
-[x64centos7]: http://ci.psmq.kurwinet.pl/badges/x86_64-centos-7-tests.svg
-[x64fedora28]: http://ci.psmq.kurwinet.pl/badges/x86_64-fedora-28-tests.svg
-[x64suse15]: http://ci.psmq.kurwinet.pl/badges/x86_64-opensuse-15-tests.svg
-[x64rhel7]: http://ci.psmq.kurwinet.pl/badges/x86_64-rhel-7-tests.svg
-[x64slackware142]: http://ci.psmq.kurwinet.pl/badges/x86_64-slackware-142-tests.svg
-[x64ubuntu1804]: http://ci.psmq.kurwinet.pl/badges/x86_64-ubuntu-1804-tests.svg
-[fsan]: http://ci.psmq.kurwinet.pl/badges/fsanitize.svg
+[a64lg]: http://ci.psmq.bofc.pl/badges/aarch64-builder-linux-gnu-tests.svg
+[armv5]: http://ci.psmq.bofc.pl/badges/armv5te926-builder-linux-gnueabihf-tests.svg
+[armv6]: http://ci.psmq.bofc.pl/badges/armv6j1136-builder-linux-gnueabihf-tests.svg
+[armv7a15]: http://ci.psmq.bofc.pl/badges/armv7a15-builder-linux-gnueabihf-tests.svg
+[armv7a9]: http://ci.psmq.bofc.pl/badges/armv7a9-builder-linux-gnueabihf-tests.svg
+[x32fb]: http://ci.psmq.bofc.pl/badges/i686-builder-freebsd-tests.svg
+[x32lg]: http://ci.psmq.bofc.pl/badges/i686-builder-linux-gnu-tests.svg
+[x32lm]: http://ci.psmq.bofc.pl/badges/i686-builder-linux-musl-tests.svg
+[x32lu]: http://ci.psmq.bofc.pl/badges/i686-builder-linux-uclibc-tests.svg
+[x32nb]: http://ci.psmq.bofc.pl/badges/i686-builder-netbsd-tests.svg
+[m32lg]: http://ci.psmq.bofc.pl/badges/mips-builder-linux-gnu-tests.svg
+[x64lg]: http://ci.psmq.bofc.pl/badges/x86_64-builder-linux-gnu-tests.svg
+[x64lm]: http://ci.psmq.bofc.pl/badges/x86_64-builder-linux-musl-tests.svg
+[x64lu]: http://ci.psmq.bofc.pl/badges/x86_64-builder-linux-uclibc-tests.svg
+[x64ss]: http://ci.psmq.bofc.pl/badges/x86_64-builder-solaris-tests.svg
+[p4aix]: http://ci.psmq.bofc.pl/badges/power4-polarhome-aix-tests.svg
+[x64debian9]: http://ci.psmq.bofc.pl/badges/x86_64-debian-9-tests.svg
+[x64centos7]: http://ci.psmq.bofc.pl/badges/x86_64-centos-7-tests.svg
+[x64fedora28]: http://ci.psmq.bofc.pl/badges/x86_64-fedora-28-tests.svg
+[x64suse15]: http://ci.psmq.bofc.pl/badges/x86_64-opensuse-15-tests.svg
+[x64rhel7]: http://ci.psmq.bofc.pl/badges/x86_64-rhel-7-tests.svg
+[x64slackware142]: http://ci.psmq.bofc.pl/badges/x86_64-slackware-142-tests.svg
+[x64ubuntu1804]: http://ci.psmq.bofc.pl/badges/x86_64-ubuntu-1804-tests.svg
+[fsan]: http://ci.psmq.bofc.pl/badges/fsanitize.svg

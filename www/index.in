@@ -1,4 +1,4 @@
-in_title="psmq.kurwinet.pl - publish subscriber based communication on top of posix mqueue"
+in_title="psmq.bofc.pl - publish subscriber based communication on top of posix mqueue"
 in_description="Set of library and programs to ease up IPC communication in embedded systems with multiple processes."
 in_keywords="c, psmq, posix, mqueue, ipc, publish, subscribe, library, network"
 in_author="Michał Łyszczek"

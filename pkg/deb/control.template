@@ -4,9 +4,9 @@ Priority: optional
 Maintainer: Michał Łyszczek <michal.lyszczek@bofc.pl>
 Build-Depends: libembedlog0 (>=0.5.0), debhelper (>=10), autotools-dev, dh-autoreconf
 Standards-Version: 3.9.8
-Vcs-Git: https://git.kurwinet.pl/psmq
-Vcs-browser: https://git.kurwinet.pl/psmq
-Homepage: https://psmq.kurwinet.pl
+Vcs-Git: https://git.bofc.pl/psmq
+Vcs-browser: https://git.bofc.pl/psmq
+Homepage: https://psmq.bofc.pl
 
 Package: psmq
 Section: embedded
