@@ -73,35 +73,30 @@
 
 static int psmq_ack
 (
-    char         *topic,     /* topic of received ack */
-    void         *payload,   /* payload of ack response */
-    size_t        paylen,    /* length of payload buffer */
-    unsigned int  prio,      /* not used */
-    void         *userdata   /* not used */
+	char         *topic,     /* topic of received ack */
+	void         *payload,   /* payload of ack response */
+	size_t        paylen,    /* length of payload buffer */
+	unsigned int  prio,      /* not used */
+	void         *userdata   /* not used */
 )
 {
-    (void)userdata;
-    (void)prio;
+	(void)userdata;
+	(void)prio;
 
-    if (topic[0] != '-')
-    {
-        /* ack messages are sent only when request starting with '-'
-         * character
-         */
+	/* ack messages are sent only when request
+	 * starting with '-' character */
+	if (topic[0] != '-')
+		return -2;
 
-        return -2;
-    }
+	if (paylen != 1)
+	{
+		/* we expected to receive 1 byte int
+		 * here with ack, nothing else */
+		errno = EBADMSG;
+		return -3;
+	}
 
-    if (paylen != 1)
-    {
-        /* we expect to receive int here with ack, nothing else
-         */
-
-        errno = EBADMSG;
-        return -3;
-    }
-
-    return *(unsigned char *)payload;
+	return *(unsigned char *)payload;
 }
 
 
@@ -121,38 +116,32 @@ static int psmq_ack
 
 static int psmq_open_ack
 (
-    char         *topic,     /* topic of received ack */
-    void         *payload,   /* payload of ack response */
-    size_t        paylen,    /* length of payload buffer */
-    unsigned int  prio,      /* not used */
-    void         *userdata   /* file descriptor to use when talking with broker */
+	char         *topic,     /* topic of received ack */
+	void         *payload,   /* payload of ack response */
+	size_t        paylen,    /* length of payload buffer */
+	unsigned int  prio,      /* not used */
+	void         *userdata   /* file descriptor to use when talking with broker */
 )
 {
-    (void)prio;
+	(void)prio;
 
-    if (strcmp(topic, PSMQ_TOPIC_OPEN) != 0)
-    {
-        /* open response is suppose to send back message with
-         * register topic, that is not the case here. There may be
-         * some old data in queue. Return -2, so caller can decide
-         * what to do with it.
-         */
+	/* open response is suppose to send back message with
+	 * register topic, that is not the case here. There may be
+	 * some old data in queue. Return -2, so caller can decide
+	 * what to do with it.  */
+	if (strcmp(topic, PSMQ_TOPIC_OPEN) != 0)
+		return -2;
 
-        return -2;
-    }
+	if (paylen != 2)
+	{
+		/* we expect to receive 2 chars here, one
+		 * for ack, and one with file descriptor */
+		errno = EBADMSG;
+		return -3;
+	}
 
-    if (paylen != 2)
-    {
-        /* we expect to receive 2 chars here, one for ack, and one
-         * with file descriptor
-         */
-
-        errno = EBADMSG;
-        return -3;
-    }
-
-    *(unsigned char *)userdata = *((unsigned char *)payload + 1);
-    return *(unsigned char *)payload;
+	*(unsigned char *)userdata = *((unsigned char *)payload + 1);
+	return *(unsigned char *)payload;
 }
 
 
@@ -163,27 +152,25 @@ static int psmq_open_ack
 
 static int psmq_receive_internal
 (
-    struct psmq     *psmq,     /* psmq object */
-    psmq_sub_clbk    clbk,     /* function to be called with received data */
-    void            *userdata  /* user data passed to clkb */
+	struct psmq     *psmq,     /* psmq object */
+	psmq_sub_clbk    clbk,     /* function to be called with received data */
+	void            *userdata  /* user data passed to clkb */
 )
 {
-    struct psmq_msg  msg;      /* buffer to receive message */
-    unsigned int     prio;     /* message priority */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmq_msg  msg;      /* buffer to receive message */
+	unsigned int     prio;     /* message priority */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, psmq);
-    VALID(EINVAL, clbk);
-    VALID(EBADF, psmq->qsub != (mqd_t)-1);
-    VALID(EBADF, psmq->qsub != psmq->qpub);
+	VALID(EINVAL, psmq);
+	VALID(EINVAL, clbk);
+	VALID(EBADF, psmq->qsub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
 
-    if (mq_receive(psmq->qsub, (char *)&msg, sizeof(msg), &prio) == -1)
-    {
-        return -1;
-    }
+	if (mq_receive(psmq->qsub, (char *)&msg, sizeof(msg), &prio) == -1)
+		return -1;
 
-    return clbk(msg.topic, msg.payload, msg.paylen, prio, userdata);
+	return clbk(msg.topic, msg.payload, msg.paylen, prio, userdata);
 }
 
 
@@ -198,65 +185,48 @@ static int psmq_receive_internal
 
 static int psmq_un_subscribe
 (
-    struct psmq  *psmq,     /* psmq object */
-    const char   *topic,    /* topic to unsubsribe from */
-    int           sub       /* subscribe - 1 or unsubsribe - 0 */
+	struct psmq  *psmq,     /* psmq object */
+	const char   *topic,    /* topic to unsubsribe from */
+	int           sub       /* subscribe - 1 or unsubsribe - 0 */
 )
 {
-    char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
-    int           ack;      /* response from the broker */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
+	int           ack;      /* response from the broker */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, psmq);
-    VALID(EINVAL, topic);
-    VALID(EINVAL, topic[0] != '\0');
-    VALID(EBADF, psmq->qsub != (mqd_t)-1);
-    VALID(EBADF, psmq->qsub != psmq->qpub);
-    VALID(ENOBUFS, strlen(topic) <= PSMQ_TOPIC_MAX);
+	VALID(EINVAL, psmq);
+	VALID(EINVAL, topic);
+	VALID(EINVAL, topic[0] != '\0');
+	VALID(EBADF, psmq->qsub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
+	VALID(ENOBUFS, strlen(topic) <= PSMQ_TOPIC_MAX);
 
-    /* send subscribe request to the server
-     */
+	/* send subscribe request to the server */
+	sprintf(topicfd, sub ? PSMQ_TOPIC_SUBSCRIBE"/%d" :
+			PSMQ_TOPIC_UNSUBSCRIBE"/%d", psmq->fd);
+	if (psmq_publish(psmq, topicfd, topic, strlen(topic) + 1, 0) != 0)
+		return -1;
 
-    sprintf(topicfd, sub ? PSMQ_TOPIC_SUBSCRIBE"/%d" :
-        PSMQ_TOPIC_UNSUBSCRIBE"/%d", psmq->fd);
+	/* if psmq is enabled (that means it is primed to receive
+	 * normal messages), we cannot check for subscribe ack,
+	 * as we could read normal message addressed to main
+	 * application. In this mode user is responsible for
+	 * reading ack - we return success here. */
+	if (psmq->enabled)
+		return 0;
 
-    if (psmq_publish(psmq, topicfd, topic, strlen(topic) + 1, 0) != 0)
-    {
-        /* failed to send message over mqueue
-         */
+	/* now wait for ack reply */
+	ack = psmq_receive_internal(psmq, psmq_ack, NULL);
 
-        return -1;
-    }
+	if (ack != 0)
+	{
+		if (ack > 0)
+			errno = ack;
+		return -1;
+	}
 
-    if (psmq->enabled)
-    {
-        /* psmq is enabled, that means it is primed to receive
-         * normal messages, so we cannot check for subscribe ack,
-         * as we could read normal message addressed to main
-         * application. In this mode user is responsible for
-         * reading ack - we return success here.
-         */
-
-        return 0;
-    }
-
-    /* now wait for ack reply
-     */
-
-    ack = psmq_receive_internal(psmq, psmq_ack, NULL);
-
-    if (ack != 0)
-    {
-        if (ack > 0)
-        {
-            errno = ack;
-        }
-
-        return -1;
-    }
-
-    return 0;
+	return 0;
 }
 
 
@@ -285,56 +255,56 @@ static int psmq_un_subscribe
 
 int psmq_publish
 (
-    struct psmq         *psmq,     /* psmq object */
-    const char          *topic,    /* topic of message to be sent */
-    const void          *payload,  /* payload of message to be sent */
-    size_t               paylen,   /* length of payload buffer */
-    unsigned int         prio      /* message priority */
+	struct psmq         *psmq,     /* psmq object */
+	const char          *topic,    /* topic of message to be sent */
+	const void          *payload,  /* payload of message to be sent */
+	size_t               paylen,   /* length of payload buffer */
+	unsigned int         prio      /* message priority */
 )
 {
-    struct psmq_msg_pub  pub;      /* buffer used to send out data to broker */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmq_msg_pub  pub;      /* buffer used to send out data to broker */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, psmq);
-    VALID(EBADF, psmq->qpub != (mqd_t)-1);
-    VALID(EBADF, psmq->qsub != psmq->qpub);
-    VALID(EINVAL, topic);
-    VALID(ENOBUFS, strlen(topic) < sizeof(pub.topic));
-    VALID(ENOBUFS, paylen <= sizeof(pub.payload));
-    VALID(EBADMSG, topic[0] == '/' || topic[0] == '-');
+	VALID(EINVAL, psmq);
+	VALID(EBADF, psmq->qpub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
+	VALID(EINVAL, topic);
+	VALID(ENOBUFS, strlen(topic) < sizeof(pub.topic));
+	VALID(ENOBUFS, paylen <= sizeof(pub.payload));
+	VALID(EBADMSG, topic[0] == '/' || topic[0] == '-');
 
-    if (topic[0] != '-')
-    {
-        /* when publishing message that is different than control
-         * messages, we need to check if those messages will fit
-         * message struct on clients. It is because struct for
-         * publish messages may be bigger than struct for receiving
-         * messages, and thus it is possible that message will
-         * reach broker with no problem, but then broker won't be
-         * able to propage it to the clients, because receive
-         * struct is not big enough
-         */
+	if (topic[0] != '-')
+	{
+		/* when publishing message that is different than control
+		 * messages, we need to check if those messages will fit
+		 * message struct on clients. It is because struct for
+		 * publish messages may be bigger than struct for receiving
+		 * messages, and thus it is possible that message will
+		 * reach broker with no problem, but then broker won't be
+		 * able to propage it to the clients, because receive
+		 * struct is not big enough
+		 */
 
-        VALID(ENOBUFS, strlen(topic) < size_of_member(struct psmq_msg, topic));
-        VALID(ENOBUFS, paylen <= size_of_member(struct psmq_msg, payload));
-    }
+		VALID(ENOBUFS, strlen(topic) < size_of_member(struct psmq_msg, topic));
+		VALID(ENOBUFS, paylen <= size_of_member(struct psmq_msg, payload));
+	}
 
-    memset(&pub, 0x00, sizeof(pub));
-    strcpy(pub.topic, topic);
-    pub.paylen = 0;
+	memset(&pub, 0x00, sizeof(pub));
+	strcpy(pub.topic, topic);
+	pub.paylen = 0;
 
-    /* payload may be NULL and it's ok, so set payload only if it
-     * was set
-     */
+	/* payload may be NULL and it's ok, so set
+	 * payload only if it was set
+	 */
 
-    if (payload)
-    {
-        memcpy(pub.payload, payload, paylen);
-        pub.paylen = paylen;
-    }
+	if (payload)
+	{
+		memcpy(pub.payload, payload, paylen);
+		pub.paylen = paylen;
+	}
 
-    return mq_send(psmq->qpub, (const char *)&pub, sizeof(pub), prio);
+	return mq_send(psmq->qpub, (const char *)&pub, sizeof(pub), prio);
 }
 
 
@@ -356,16 +326,16 @@ int psmq_publish
 
 int psmq_receive
 (
-    struct psmq   *psmq,     /* psmq object */
-    psmq_sub_clbk  clbk,     /* function to be called with received data */
-    void          *userdata  /* user data passed to clkb */
+	struct psmq   *psmq,     /* psmq object */
+	psmq_sub_clbk  clbk,     /* function to be called with received data */
+	void          *userdata  /* user data passed to clkb */
 )
 {
-    VALID(EINVAL, psmq);
-    VALID(EBADF, psmq->qpub != (mqd_t)-1);
-    VALID(EBADF, psmq->qsub != psmq->qpub);
-    VALID(ENOTCONN, psmq->enabled);
-    return psmq_receive_internal(psmq, clbk, userdata);
+	VALID(EINVAL, psmq);
+	VALID(EBADF, psmq->qpub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
+	VALID(ENOTCONN, psmq->enabled);
+	return psmq_receive_internal(psmq, clbk, userdata);
 }
 
 
@@ -391,29 +361,27 @@ int psmq_receive
 
 int psmq_timedreceive
 (
-    struct psmq     *psmq,     /* psmq object */
-    psmq_sub_clbk    clbk,     /* function to be called with received data */
-    void            *userdata, /* user data passed to clkb */
-    struct timespec *tp        /* absolute point in time when timeout occurs */
+	struct psmq     *psmq,     /* psmq object */
+	psmq_sub_clbk    clbk,     /* function to be called with received data */
+	void            *userdata, /* user data passed to clkb */
+	struct timespec *tp        /* absolute point in time when timeout occurs */
 )
 {
-    struct psmq_msg  msg;      /* buffer to receive message */
-    unsigned int     prio;     /* received message priority */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmq_msg  msg;      /* buffer to receive message */
+	unsigned int     prio;     /* received message priority */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, psmq);
-    VALID(EINVAL, clbk);
-    VALID(EBADF, psmq->qsub != (mqd_t)-1);
-    VALID(EBADF, psmq->qsub != psmq->qpub);
-    VALID(ENOTCONN, psmq->enabled);
+	VALID(EINVAL, psmq);
+	VALID(EINVAL, clbk);
+	VALID(EBADF, psmq->qsub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
+	VALID(ENOTCONN, psmq->enabled);
 
-    if (mq_timedreceive(psmq->qsub, (char *)&msg, sizeof(msg), &prio, tp) == -1)
-    {
-        return -1;
-    }
+	if (mq_timedreceive(psmq->qsub, (char *)&msg, sizeof(msg), &prio, tp) == -1)
+		return -1;
 
-    return clbk(msg.topic, msg.payload, msg.paylen, prio, userdata);
+	return clbk(msg.topic, msg.payload, msg.paylen, prio, userdata);
 }
 
 
@@ -425,51 +393,49 @@ int psmq_timedreceive
 
 int psmq_timedreceive_ms
 (
-    struct psmq     *psmq,     /* psmq object */
-    psmq_sub_clbk    clbk,     /* function to be called with received data */
-    void            *userdata, /* user data passed to clkb */
-    size_t           ms        /* ms to wait until timeout occurs */
+	struct psmq     *psmq,     /* psmq object */
+	psmq_sub_clbk    clbk,     /* function to be called with received data */
+	void            *userdata, /* user data passed to clkb */
+	size_t           ms        /* ms to wait until timeout occurs */
 )
 {
-    struct timespec  tp;       /* absolute point in time when timeout occurs */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct timespec  tp;       /* absolute point in time when timeout occurs */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    /* no VALID() checks, since all parameters are validated in
-     * psmqd_timedreceive() function
-     */
+	/* no VALID() checks, since all parameters are
+	 * validated in psmqd_timedreceive() function */
 
-    tp.tv_sec = 0;
-    tp.tv_nsec = 0;
+	tp.tv_sec = 0;
+	tp.tv_nsec = 0;
 
-    if (ms)
-    {
-        size_t  nsec;  /* number of nanoseconds to add to timer */
-        /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	if (ms)
+	{
+		size_t  nsec;  /* number of nanoseconds to add to timer */
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-        /* milisecond is set, configure tp to wait this ammount of time
-         * instead of returning immediately
-         */
+		/* milisecond is set, configure tp to wait
+		 * this ammount of time instead of
+		 * returning immediately */
 
-        clock_gettime(CLOCK_REALTIME, &tp);
+		clock_gettime(CLOCK_REALTIME, &tp);
 
-        nsec = ms % 1000;
-        nsec *= 1000000l;
+		nsec = ms % 1000;
+		nsec *= 1000000l;
 
-        tp.tv_sec += ms / 1000;
-        tp.tv_nsec += nsec;
+		tp.tv_sec += ms / 1000;
+		tp.tv_nsec += nsec;
 
-        if (tp.tv_nsec >= 1000000000l)
-        {
-            /* overflow on nsec part */
+		if (tp.tv_nsec >= 1000000000l)
+		{
+			/* overflow on nsec part */
+			tp.tv_nsec -= 1000000000l;
+			tp.tv_sec += 1;
+		}
+	}
 
-            tp.tv_nsec -= 1000000000l;
-            tp.tv_sec += 1;
-        }
-    }
-
-    return psmq_timedreceive(psmq, clbk, userdata, &tp);
+	return psmq_timedreceive(psmq, clbk, userdata, &tp);
 }
 
 
@@ -483,113 +449,103 @@ int psmq_timedreceive_ms
 
 int psmq_init
 (
-    struct psmq     *psmq,        /* psmq object to initialize */
-    const char      *brokername,  /* name of the broker to connect to */
-    const char      *mqname,      /* name of the reciving queue to create */
-    int              maxmsg       /* max queued messages in mqname */
+	struct psmq     *psmq,        /* psmq object to initialize */
+	const char      *brokername,  /* name of the broker to connect to */
+	const char      *mqname,      /* name of the reciving queue to create */
+	int              maxmsg       /* max queued messages in mqname */
 )
 {
-    struct mq_attr   mqa;         /* mqueue attributes */
-    int              ack;         /* ACK from the broker after open */
-    size_t           mqnamelen;   /* length of mqname string */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct mq_attr   mqa;         /* mqueue attributes */
+	int              ack;         /* ACK from the broker after open */
+	size_t           mqnamelen;   /* length of mqname string */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, psmq);
-    VALID(EINVAL, brokername);
-    VALID(EINVAL, brokername[0] == '/');
-    VALID(EINVAL, mqname);
-    VALID(EINVAL, mqname[0] == '/');
-    VALID(EINVAL, maxmsg > 0);
-    mqnamelen = strlen(mqname);
-    VALID(ENAMETOOLONG, mqnamelen < size_of_member(struct psmq_msg_pub,
-        payload));
+	VALID(EINVAL, psmq);
+	VALID(EINVAL, brokername);
+	VALID(EINVAL, brokername[0] == '/');
+	VALID(EINVAL, mqname);
+	VALID(EINVAL, mqname[0] == '/');
+	VALID(EINVAL, maxmsg > 0);
+	mqnamelen = strlen(mqname);
+	VALID(ENAMETOOLONG,
+			mqnamelen < size_of_member(struct psmq_msg_pub, payload));
 
 
-    memset(psmq, 0x00, sizeof(struct psmq));
-    mqa.mq_msgsize = sizeof(struct psmq_msg);
-    mqa.mq_maxmsg = maxmsg;
-    psmq->qsub = (mqd_t)-1;
-    psmq->qpub = (mqd_t)-1;
+	memset(psmq, 0x00, sizeof(struct psmq));
+	mqa.mq_msgsize = sizeof(struct psmq_msg);
+	mqa.mq_maxmsg = maxmsg;
+	psmq->qsub = (mqd_t)-1;
+	psmq->qpub = (mqd_t)-1;
 
-    /* if staled queue exist, remove it, so it doesn't do weird
-     * stuff
-     */
+	/* if staled queue exist, remove it, so it
+	 * doesn't do weird stuff */
+	mq_unlink(mqname);
 
-    mq_unlink(mqname);
+	/* open subscribe queue, where we will receive
+	 * data we subscribed to, and at the beginning
+	 * is used to report error from broker to client */
+	psmq->qsub = mq_open(mqname, O_RDONLY | O_CREAT, 0600, &mqa);
+	if (psmq->qsub == (mqd_t)-1)
+		return -1;
 
-    /* open subscribe queue, where we will receive data we
-     * subscribed to, and at the beginning is used to report
-     * error from broker to client
-     */
+	/* open publish queue, this will be used to
+	 * subscribed to topics at the start, and
+	 * later this will be used to publish data on
+	 * given topic */
+	psmq->qpub = mq_open(brokername, O_WRONLY);
+	if (psmq->qpub == (mqd_t)-1)
+	{
+		mq_close(psmq->qsub);
+		psmq->qsub = (mqd_t)-1;
+		return -1;
+	}
 
-    psmq->qsub = mq_open(mqname, O_RDONLY | O_CREAT, 0600, &mqa);
-    if (psmq->qsub == (mqd_t)-1)
-    {
-        return -1;
-    }
+	/* both queues have been created, that means
+	 * we have enough memory to operate, now we
+	 * need to register to broker, so it knows
+	 * where to send messages */
+	if (psmq_publish(psmq, PSMQ_TOPIC_OPEN, mqname, mqnamelen + 1, 0) != 0)
+		goto error;
 
-    /* open publish queue, this will be used to subscribed to
-     * topics at the start, and later this will be used to publish
-     * data on given topic
-     */
+	/* check response from the broker on subscribe
+	 * queue to check if broker managed to
+	 * allocate memory for us and open queue on
+	 * his side. Read from broker until we read
+	 * something else than -2, which means we read
+	 * data other than register ack from the
+	 * broker. This may happen when we open queue
+	 * that already has some outstanding data -
+	 * like from previous crashed session, we can
+	 * safely discard those messages.
+	 */
 
-    psmq->qpub = mq_open(brokername, O_WRONLY);
-    if (psmq->qpub == (mqd_t)-1)
-    {
-        mq_close(psmq->qsub);
-        psmq->qsub = (mqd_t)-1;
-        return -1;
-    }
+	while ((ack = psmq_receive_internal(psmq, psmq_open_ack, &psmq->fd)) == -2)
+	{};
 
-    /* both queues have been created, that means we have enough
-     * memory to operate, now we need to register to broker, so it
-     * knows where to send messages
-     */
+	/* broker will return either 0 or errno to
+	 * indicate what went wrong on his side, if
+	 * ack is 0, broker will send file descriptor
+	 * to use when communicating with him. */
 
-    if (psmq_publish(psmq, PSMQ_TOPIC_OPEN, mqname, mqnamelen + 1, 0) != 0)
-    {
-        goto error;
-    }
+	if (ack != 0)
+	{
+		if (ack > 0)
+			errno = ack;
 
-    /* check response from the broker on subscribe queue to check
-     * if broker managed to allocate memory for us and open queue
-     * on his side. Read from broker until we read something else
-     * than -2, which means we read data other than register ack
-     * from the broker. This may happen when we open queue that
-     * already has some outstanding data - like from previous
-     * crashed session, we can safely discard those messages.
-     */
+		goto error;
+	}
 
-    while ((ack = psmq_receive_internal(psmq, psmq_open_ack, &psmq->fd)) == -2)
-        {};
-
-    /* broker will return either 0 or errno to indicate what
-     * went wrong on his side, if ack is 0, broker will send
-     * file descriptor to use when communicating with him.
-     */
-
-    if (ack != 0)
-    {
-        if (ack > 0)
-        {
-            errno = ack;
-        }
-
-        goto error;
-    }
-
-    /* ack received and fd is valid, we are victorious
-     */
-
-    return 0;
+	/* ack received and fd is valid,
+	 * we are victorious */
+	return 0;
 
 error:
-    mq_close(psmq->qpub);
-    mq_close(psmq->qsub);
-    psmq->qpub = (mqd_t)-1;
-    psmq->qsub = (mqd_t)-1;
-    return -1;
+	mq_close(psmq->qpub);
+	mq_close(psmq->qsub);
+	psmq->qpub = (mqd_t)-1;
+	psmq->qsub = (mqd_t)-1;
+	return -1;
 }
 
 
@@ -600,28 +556,26 @@ error:
 
 int psmq_cleanup
 (
-    struct psmq  *psmq  /* psmq object to cleanup */
+	struct psmq  *psmq  /* psmq object to cleanup */
 )
 {
-    char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, psmq);
-    VALID(EBADF, psmq->qsub != psmq->qpub);
+	VALID(EINVAL, psmq);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
 
-    /* send close() to the broker, we don't care if it succed or not,
-     * we close our booth and nothing can stop us from doing it
-     */
-
-    sprintf(topicfd, PSMQ_TOPIC_CLOSE"/%d", psmq->fd);
-    psmq_publish(psmq, topicfd, NULL, 0, 0);
-    mq_close(psmq->qpub);
-    mq_close(psmq->qsub);
-    psmq->qpub = (mqd_t) -1;
-    psmq->qsub = (mqd_t) -1;
-    return 0;
-
+	/* send close() to the broker, we don't care
+	 * if it succed or not, we close our booth and
+	 * nothing can stop us from doing it */
+	sprintf(topicfd, PSMQ_TOPIC_CLOSE"/%d", psmq->fd);
+	psmq_publish(psmq, topicfd, NULL, 0, 0);
+	mq_close(psmq->qpub);
+	mq_close(psmq->qsub);
+	psmq->qpub = (mqd_t) -1;
+	psmq->qsub = (mqd_t) -1;
+	return 0;
 }
 
 
@@ -636,11 +590,11 @@ int psmq_cleanup
 
 int psmq_subscribe
 (
-    struct psmq      *psmq,     /* psmq object */
-    const char       *topic     /* topic to register to */
+	struct psmq      *psmq,     /* psmq object */
+	const char       *topic     /* topic to register to */
 )
 {
-    return psmq_un_subscribe(psmq, topic, 1);
+	return psmq_un_subscribe(psmq, topic, 1);
 }
 
 
@@ -655,11 +609,11 @@ int psmq_subscribe
 
 int psmq_unsubscribe
 (
-    struct psmq      *psmq,     /* psmq object */
-    const char       *topic     /* topic to register to */
+	struct psmq      *psmq,     /* psmq object */
+	const char       *topic     /* topic to register to */
 )
 {
-    return psmq_un_subscribe(psmq, topic, 0);
+	return psmq_un_subscribe(psmq, topic, 0);
 }
 
 
@@ -674,51 +628,40 @@ int psmq_unsubscribe
 
 int psmq_enable
 (
-    struct psmq  *psmq,   /* psmq object */
-    int           enable  /* enable or disable client */
+	struct psmq  *psmq,   /* psmq object */
+	int           enable  /* enable or disable client */
 )
 {
-    char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
-    int           ack;    /* response from the broker */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
+	int           ack;    /* response from the broker */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, psmq);
-    VALID(EBADF, psmq->qsub != (mqd_t)-1);
-    VALID(EBADF, psmq->qsub != psmq->qpub);
-    VALID(EINVAL, (enable & ~1) == 0);
+	VALID(EINVAL, psmq);
+	VALID(EBADF, psmq->qsub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
+	VALID(EINVAL, (enable & ~1) == 0);
 
-    /* send subscribe request to the server
-     */
+	/* send subscribe request to the server */
+	sprintf(topicfd, enable ? PSMQ_TOPIC_ENABLE"/%d" : PSMQ_TOPIC_DISABLE"/%d",
+			psmq->fd);
 
-    sprintf(topicfd, enable ? PSMQ_TOPIC_ENABLE"/%d" : PSMQ_TOPIC_DISABLE"/%d",
-        psmq->fd);
+	if (psmq_publish(psmq, topicfd, NULL, 0, 0) != 0)
+		return -1;
 
-    if (psmq_publish(psmq, topicfd, NULL, 0, 0) != 0)
-    {
-        /* failed to send message over mqueue
-         */
+	/* now wait for ack reply */
+	ack = psmq_receive_internal(psmq, psmq_ack, NULL);
 
-        return -1;
-    }
+	if (ack != 0)
+	{
+		if (ack > 0)
+			errno = ack;
 
-    /* now wait for ack reply
-     */
+		return -1;
+	}
 
-    ack = psmq_receive_internal(psmq, psmq_ack, NULL);
-
-    if (ack != 0)
-    {
-        if (ack > 0)
-        {
-            errno = ack;
-        }
-
-        return -1;
-    }
-
-    psmq->enabled = enable;
-    return 0;
+	psmq->enabled = enable;
+	return 0;
 }
 
 
@@ -739,33 +682,24 @@ int psmq_enable
 
 int psmq_disable_threaded
 (
-    struct psmq  *psmq   /* psmq object */
+	struct psmq  *psmq   /* psmq object */
 )
 {
-    char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, psmq);
-    VALID(EBADF, psmq->qsub != (mqd_t)-1);
-    VALID(EBADF, psmq->qsub != psmq->qpub);
+	VALID(EINVAL, psmq);
+	VALID(EBADF, psmq->qsub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
 
-    /* send disable request to the server
-     */
+	/* send disable request to the server */
+	sprintf(topicfd, PSMQ_TOPIC_DISABLE"/%d", psmq->fd);
 
-    sprintf(topicfd, PSMQ_TOPIC_DISABLE"/%d", psmq->fd);
+	if (psmq_publish(psmq, topicfd, NULL, 0, 0) != 0)
+		return -1;
 
-    if (psmq_publish(psmq, topicfd, NULL, 0, 0) != 0)
-    {
-        /* failed to send message over mqueue
-         */
-
-        return -1;
-    }
-
-    /* threaded disable, caller is reponsible of setting
-     * psmq->enabled to 0
-     */
-
-    return 0;
+	/* threaded disable, caller is reponsible of
+	 * setting psmq->enabled to 0 */
+	return 0;
 }

@@ -66,130 +66,117 @@
 
 static int cfg_parse_args
 (
-    int    argc,   /* number of arguments in argv */
-    char  *argv[]  /* argument list */
+	int    argc,   /* number of arguments in argv */
+	char  *argv[]  /* argument list */
 )
 {
-    /* macros to parse arguments in switch(opt) block
-     */
+	/* macros to parse arguments in switch(opt) block */
 
 
-    /* check if optarg is between MINV and MAXV values and if so,
-     * store converted optarg in to config.OPTNAME field. If error
-     * occurs, force function to return with -1 error
-     */
+	/* check if optarg is between MINV and MAXV values and if so,
+	 * store converted optarg in to config.OPTNAME field. If error
+	 * occurs, force function to return with -1 error */
+#   define PARSE_INT(OPTNAME, MINV, MAXV) \
+	{ \
+		long   val;     /* value converted from OPTARG */ \
+		char  *endptr;  /* pointer for errors fron strtol */ \
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/ \
+		\
+		val = strtol(optarg, &endptr, 10); \
+		if (*endptr != '\0') \
+		{ \
+			/* error occured */ \
+			fprintf(stderr, "wrong value '%s' for option '%s\n", \
+					optarg, #OPTNAME); \
+			return -1; \
+		} \
+		\
+		if (val < MINV || MAXV < val) \
+		{ \
+			/* number is outside of defined domain */ \
+			fprintf(stderr, "value for '%s' should be between %d and %d\n", \
+					#OPTNAME, MINV, MAXV); \
+			return -1; \
+		} \
+		\
+		g_psmqd_cfg.OPTNAME = val; \
+	}
+
+	int  arg;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-#   define PARSE_INT(OPTNAME, MINV, MAXV)                                      \
-    {                                                                          \
-        long   val;     /* value converted from OPTARG */                      \
-        char  *endptr;  /* pointer for errors fron strtol */                   \
-        /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/   \
-                                                                               \
-        val = strtol(optarg, &endptr, 10);                                     \
-                                                                               \
-        if (*endptr != '\0')                                                   \
-        {                                                                      \
-            /* error occured                                                   \
-             */                                                                \
-                                                                               \
-            fprintf(stderr, "wrong value '%s' for option '%s\n",               \
-                optarg, #OPTNAME);                                             \
-            return -1;                                                         \
-        }                                                                      \
-                                                                               \
-        if (val < MINV || MAXV < val)                                          \
-        {                                                                      \
-            /* number is outside of defined domain                             \
-             */                                                                \
-                                                                               \
-            fprintf(stderr, "value for '%s' should be between %d and %d\n",    \
-                #OPTNAME, MINV, MAXV);                                         \
-            return -1;                                                         \
-        }                                                                      \
-                                                                               \
-        g_psmqd_cfg.OPTNAME = val;                                             \
-    }
-
-    int  arg;
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-    optind = 1;
-    while ((arg = getopt(argc, argv, ":vhl:dcp:m:b:r")) != -1)
-    {
-        switch (arg)
-        {
+	optind = 1;
+	while ((arg = getopt(argc, argv, ":vhl:dcp:m:b:r")) != -1)
+	{
+		switch (arg)
+		{
 #if PSMQ_ENABLE_DAEMON
-        case 'd': g_psmqd_cfg.daemonize = 1; break;
+		case 'd': g_psmqd_cfg.daemonize = 1; break;
 #endif
+		case 'c': g_psmqd_cfg.colorful_output = 1; break;
+		case 'l': PARSE_INT(log_level, 0, 7); break;
+		case 'p': g_psmqd_cfg.program_log = optarg; break;
 
-        case 'c': g_psmqd_cfg.colorful_output = 1; break;
-        case 'l': PARSE_INT(log_level, 0, 7); break;
-        case 'p': g_psmqd_cfg.program_log = optarg; break;
+		case 'm': PARSE_INT(broker_maxmsg, 0, INT_MAX); break;
+		case 'b': g_psmqd_cfg.broker_name = optarg; break;
+		case 'r': g_psmqd_cfg.remove_queue = 1; break;
 
-        case 'm': PARSE_INT(broker_maxmsg, 0, INT_MAX); break;
-        case 'b': g_psmqd_cfg.broker_name = optarg; break;
-        case 'r': g_psmqd_cfg.remove_queue = 1; break;
-
-        case 'h':
-            printf(
-"psmqd - broker for publish subscribe over mqueue\n"
-"\n"
-"Usage: %s [-h | -v | options]\n"
-"\n", argv[0]);
-            printf(
-"options:\n"
-"\t-h           print this help and exit\n"
-"\t-v           print version and exit\n"
-"\t-c           enable nice colors for logs\n"
-
+		case 'h':
+			printf(
+					"psmqd - broker for publish subscribe over mqueue\n"
+					"\n"
+					"Usage: %s [-h | -v | options]\n"
+					"\n", argv[0]);
+			printf(
+					"options:\n"
+					"\t-h           print this help and exit\n"
+					"\t-v           print version and exit\n"
+					"\t-c           enable nice colors for logs\n"
 #if PSMQ_ENABLE_DAEMON
-"\t-d           run as daemon\n"
+					"\t-d           run as daemon\n"
 #endif
+					"\t-l<level>    logging level 0-7\n"
+					"\t-p<path>     where logs will be stored (stdout if not specified)\n");
+			printf(
+					"\t-b<name>     name for broker control queue\n"
+					"\t-r           if set, control queue will be removed before starting\n"
+					"\t-m<maxmsg>   max messages on broker control queue\n"
+					"\n");
+			printf(
+					"logging levels:\n"
+					"\t0         fatal errors, application cannot continue\n"
+					"\t1         major failure, needs immediate attention\n"
+					"\t2         critical errors\n"
+					"\t3         error but recoverable\n"
+					"\t4         warnings\n"
+					"\t5         normal message, but of high importance\n"
+					"\t6         info log, doesn't print that much (default)\n"
+					"\t7         debug, not needed in production\n"
+					"\n");
+			return -2;
 
-"\t-l<level>    logging level 0-7\n"
-"\t-p<path>     where logs will be stored (stdout if not specified)\n");
-            printf(
-"\t-b<name>     name for broker control queue\n"
-"\t-r           if set, control queue will be removed before starting\n"
-"\t-m<maxmsg>   max messages on broker control queue\n"
-"\n");
-            printf(
-"logging levels:\n"
-"\t0         fatal errors, application cannot continue\n"
-"\t1         major failure, needs immediate attention\n"
-"\t2         critical errors\n"
-"\t3         error but recoverable\n"
-"\t4         warnings\n"
-"\t5         normal message, but of high importance\n"
-"\t6         info log, doesn't print that much (default)\n"
-"\t7         debug, not needed in production\n"
-"\n");
+		case 'v':
+			printf("psmqd "PACKAGE_VERSION"\n"
+					"by Michał Łyszczek <michal.lyszczek@bofc.pl>\n");
 
-            return -2;
+			return -3;
 
-        case 'v':
-            printf("psmqd "PACKAGE_VERSION"\n"
-                "by Michał Łyszczek <michal.lyszczek@bofc.pl>\n");
+		case ':':
+			fprintf(stderr, "option -%c requires an argument\n", optopt);
+			return -4;
 
-            return -3;
+		case '?':
+			fprintf(stdout, "unknown option -%c\n", optopt);
+			return -5;
 
-        case ':':
-            fprintf(stderr, "option -%c requires an argument\n", optopt);
-            return -4;
+		default:
+			fprintf(stderr, "unexpected return from getopt '0x%02x'\n", arg);
+			return -6;
+	}
+}
 
-        case '?':
-            fprintf(stdout, "unknown option -%c\n", optopt);
-            return -5;
-
-        default:
-            fprintf(stderr, "unexpected return from getopt '0x%02x'\n", arg);
-            return -6;
-        }
-    }
-
-    return 0;
+	return 0;
 
 #   undef PARSE_INT
 }
@@ -207,30 +194,24 @@ static int cfg_parse_args
 
 int psmqd_cfg_init
 (
-    int    argc,   /* number of arguments in argv */
-    char  *argv[]  /* argument list */
+	int    argc,   /* number of arguments in argv */
+	char  *argv[]  /* argument list */
 )
 {
-    /* disable error printing from getopt library
-     */
-
+	/* disable error printing from getopt library */
 #if PSMQ_NO_OPTERR == 0
-    opterr = 0;
+	opterr = 0;
 #endif
 
-    /* set g_psmqd_cfg object to well-known default state
-     */
+	/* set g_psmqd_cfg object to well-known default state */
+	memset(&g_psmqd_cfg, 0x00, sizeof(g_psmqd_cfg));
+	g_psmqd_cfg.log_level = EL_INFO;
+	g_psmqd_cfg.broker_maxmsg = 10;
+	g_psmqd_cfg.broker_name = "/psmqd";
 
-    memset(&g_psmqd_cfg, 0x00, sizeof(g_psmqd_cfg));
-    g_psmqd_cfg.log_level = EL_INFO;
-    g_psmqd_cfg.broker_maxmsg = 10;
-    g_psmqd_cfg.broker_name = "/psmqd";
-
-    /* parse options from command line argument overwritting
-     * default ones
-     */
-
-    return cfg_parse_args(argc, argv);
+	/* parse options from command line argument
+	 * overwritting default ones */
+	return cfg_parse_args(argc, argv);
 }
 
 
@@ -241,42 +222,41 @@ int psmqd_cfg_init
 
 void psmqd_cfg_print(void)
 {
-    /* macro for easy field printing
-     */
+	/* macro for easy field printing */
 
 #define CONFIG_PRINT(field, type) \
-    el_oprint(OELN, "%s%s "type, #field, padder + strlen(#field), \
-        g_psmqd_cfg.field)
+	el_oprint(OELN, "%s%s "type, #field, padder + strlen(#field), \
+			g_psmqd_cfg.field)
 
 #define CONFIG_PRINT_VAR(var, type) \
-    el_oprint(OELN, "%s%s "type, #var, padder + strlen(#var), var)
+		el_oprint(OELN, "%s%s "type, #var, padder + strlen(#var), var)
 
 #define PSMQ_MSG_TOPIC size_of_member(struct psmq_msg, topic)
 #define PSMQ_MSG_PAYLOAD size_of_member(struct psmq_msg, payload)
 #define PSMQ_MSG_PUB_TOPIC size_of_member(struct psmq_msg_pub, topic)
 #define PSMQ_MSG_PUB_PAYLOAD size_of_member(struct psmq_msg_pub, payload)
 
-    char padder[] = "............................:";
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	char padder[] = "............................:";
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    el_oprint(OELN, PACKAGE_STRING);
-    el_oprint(OELN, "psmqd configuration");
+	el_oprint(OELN, PACKAGE_STRING);
+	el_oprint(OELN, "psmqd configuration");
 #if PSMQ_ENABLE_DAEMON
-    CONFIG_PRINT(daemonize, "%d");
+	CONFIG_PRINT(daemonize, "%d");
 #endif
-    CONFIG_PRINT(log_level, "%d");
-    CONFIG_PRINT(colorful_output, "%d");
-    CONFIG_PRINT(program_log, "%s");
-    CONFIG_PRINT(broker_name, "%s");
-    CONFIG_PRINT(broker_maxmsg, "%d");
-    CONFIG_PRINT(remove_queue, "%d");
-    CONFIG_PRINT_VAR(PSMQ_MSG_TOPIC, "%d");
-    CONFIG_PRINT_VAR(PSMQ_MSG_PAYLOAD, "%d");
-    CONFIG_PRINT_VAR(PSMQ_MSG_PUB_TOPIC, "%d");
-    CONFIG_PRINT_VAR(PSMQ_MSG_PUB_PAYLOAD, "%d");
-    CONFIG_PRINT_VAR(sizeof(struct psmq_msg), "%lu");
-    CONFIG_PRINT_VAR(sizeof(struct psmq_msg_pub), "%lu");
+	CONFIG_PRINT(log_level, "%d");
+	CONFIG_PRINT(colorful_output, "%d");
+	CONFIG_PRINT(program_log, "%s");
+	CONFIG_PRINT(broker_name, "%s");
+	CONFIG_PRINT(broker_maxmsg, "%d");
+	CONFIG_PRINT(remove_queue, "%d");
+	CONFIG_PRINT_VAR(PSMQ_MSG_TOPIC, "%d");
+	CONFIG_PRINT_VAR(PSMQ_MSG_PAYLOAD, "%d");
+	CONFIG_PRINT_VAR(PSMQ_MSG_PUB_TOPIC, "%d");
+	CONFIG_PRINT_VAR(PSMQ_MSG_PUB_PAYLOAD, "%d");
+	CONFIG_PRINT_VAR(sizeof(struct psmq_msg), "%lu");
+	CONFIG_PRINT_VAR(sizeof(struct psmq_msg_pub), "%lu");
 
 #undef CONFIG_PRINT
 }

@@ -12,10 +12,8 @@
 
 int main(void)
 {
-    /* if it compiles - it works
-     */
-
-    psmq_init(NULL, NULL, NULL, 0);
-    fprintf(stderr, "psmq works!\n");
-    return 0;
+	/* if it compiles - it works */
+	psmq_init(NULL, NULL, NULL, 0);
+	fprintf(stderr, "psmq works!\n");
+	return 0;
 }

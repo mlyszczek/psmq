@@ -47,8 +47,8 @@ mt_defs_ext();
 
 struct main_args
 {
-    int     argc;
-    char  **argv;
+	int     argc;
+	char  **argv;
 };
 
 
@@ -86,32 +86,28 @@ char         gt_sub_name[QNAME_LEN];    /* sub queue name for tests */
 
 static void *psmqt_thread
 (
-    void             *arg     /* args to run psmqd_main() with */
+	void             *arg     /* args to run psmqd_main() with */
 )
 {
-    struct main_args *args;   /* args to run psmqd_main() with */
-    int              *ret;    /* return value from psmqd_main() */
-    int               i;      /* simple iterator */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct main_args *args;   /* args to run psmqd_main() with */
+	int              *ret;    /* return value from psmqd_main() */
+	int               i;      /* simple iterator */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    args = arg;
+	args = arg;
 
-    ret = malloc(sizeof(*ret));
-    *ret = psmqd_main(args->argc, args->argv);
+	ret = malloc(sizeof(*ret));
+	*ret = psmqd_main(args->argc, args->argv);
 
-    /* psmqd_main ended, free resources
-     */
+	/* psmqd_main ended, free resources */
+	for (i = 0; i != args->argc; ++i)
+		free(args->argv[i]);
 
-    for (i = 0; i != args->argc; ++i)
-    {
-        free(args->argv[i]);
-    }
+	free(args->argv);
+	free(args);
 
-    free(args->argv);
-    free(args);
-
-    return ret;
+	return ret;
 }
 
 
@@ -126,85 +122,77 @@ static void *psmqt_thread
 
 static int psmqt_run_default(void)
 {
-    int                i;      /* simple iterator */
-    time_t             start;  /* starting point of waiting for confirmation */
-    struct main_args  *args;   /* allocated args to create psmqd_main() with */
-    struct timespec    tp;     /* time to sleep between psmqd_main() run check*/
-    const char        *argv[] = { "psmqd", "-b", NULL, "-l6", "-p./psmqd.log",
-        "-m10", NULL };
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	int                i;      /* simple iterator */
+	time_t             start;  /* starting point of waiting for confirmation */
+	struct main_args  *args;   /* allocated args to create psmqd_main() with */
+	struct timespec    tp;     /* time to sleep between psmqd_main() run check*/
+	const char        *argv[] = { "psmqd", "-b", NULL, "-l6", "-p./psmqd.log",
+		"-m10", NULL };
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    psmqt_gen_queue_name(gt_broker_name, sizeof(gt_broker_name));
-    argv[2] = gt_broker_name;
+	psmqt_gen_queue_name(gt_broker_name, sizeof(gt_broker_name));
+	argv[2] = gt_broker_name;
 
-    args = malloc(sizeof(*args));
-    args->argc = sizeof(argv)/sizeof(*argv) - 1;
-    args->argv = calloc(args->argc, sizeof(const char *));
-    for (i = 0; i != args->argc; ++i)
-    {
-        args->argv[i] = malloc(strlen(argv[i]) + 1);
-        strcpy(args->argv[i], argv[i]);
-    }
+	args = malloc(sizeof(*args));
+	args->argc = sizeof(argv)/sizeof(*argv) - 1;
+	args->argv = calloc(args->argc, sizeof(const char *));
+	for (i = 0; i != args->argc; ++i)
+	{
+		args->argv[i] = malloc(strlen(argv[i]) + 1);
+		strcpy(args->argv[i], argv[i]);
+	}
 
-    mq_unlink(gt_broker_name);
-    pthread_create(&gt_psmqd_t, NULL, psmqt_thread, args);
+	mq_unlink(gt_broker_name);
+	pthread_create(&gt_psmqd_t, NULL, psmqt_thread, args);
 
-    /* wait until psmqd_start() creates gt_broker_name mqueue,
-     * that will be our signal that daemon started without
-     * problems
-     */
+	/* wait until psmqd_start() creates gt_broker_name mqueue,
+	 * that will be our signal that daemon started without
+	 * problems */
 
-    start = time(NULL);
-    tp.tv_sec = 0;
-    tp.tv_nsec = 1000 * 1000; /* 1[ms] */
-    for (;;)
-    {
-        mqd_t mq;
-        /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	start = time(NULL);
+	tp.tv_sec = 0;
+	tp.tv_nsec = 1000 * 1000; /* 1[ms] */
+	for (;;)
+	{
+		mqd_t mq;
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-        mq = mq_open(gt_broker_name, O_RDONLY);
-        if (mq != (mqd_t)-1)
-        {
-            /* file exists, that means psmqd_main() has created
-             * it and is running
-             */
+		mq = mq_open(gt_broker_name, O_RDONLY);
+		if (mq != (mqd_t)-1)
+		{
+			/* file exists, that means
+			 * psmqd_main() has created it and is
+			 * running */
+			mq_close(mq);
+			return 0;
+		}
 
-            mq_close(mq);
-            return 0;
-        }
+		if (errno != ENOENT)
+		{
+			/* that error should not occur,
+			 * something is very wrong
+			 */
+			el_perror(ELF, "mq_open() failed");
+			return -1;
+		}
 
-        if (errno != ENOENT)
-        {
-            /* that error should not occur, something is very
-             * wrong
-             */
+		/* mqueue doesn't exist yet, psmqd_main()
+		 * not running yes, we will be waiting
+		 * maximum of 5 seconds before realizing
+		 * psmqd probably crashed */
+		if (time(NULL) - start >= 500)
+		{
+			/* psmqd couldn't create queue for more than 5
+			 * seconds, it probably crashed or something */
+			return -1;
+		}
 
-            el_perror(ELF, "mq_open() failed");
-            return -1;
-        }
-
-        /* mqueue doesn't exist yet, psmqd_main() not running
-         * yes, we will be waiting maximum of 5 seconds before
-         * realizing psmqd probably crashed
-         */
-
-        if (time(NULL) - start >= 500)
-        {
-            /* psmqd couldn't create queue for more than 5
-             * seconds, it probably crashed or something
-             */
-
-            return -1;
-        }
-
-        /* psmqd still has time to create mqueue
-         */
-
-        nanosleep(&tp, NULL);
-        continue;
-    }
+		/* psmqd still has time to create mqueue */
+		nanosleep(&tp, NULL);
+		continue;
+	}
 }
 
 
@@ -227,25 +215,21 @@ static int psmqt_run_default(void)
 
 void psmqt_gen_random_string
 (
-    char              *s,  /* generated data will be stored here */
-    size_t             l   /* length of the data to generate (with '\0') */
+	char              *s,  /* generated data will be stored here */
+	size_t             l   /* length of the data to generate (with '\0') */
 )
 {
-    static const char  alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-    size_t             i;
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	static const char  alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+	size_t             i;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-    if (l == 0)
-    {
-        return;
-    }
+	if (l == 0)
+		return;
 
-    for (i = 0; i != l; ++i)
-    {
-        s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-    }
+	for (i = 0; i != l; ++i)
+		s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
 
-    s[i - 1] = '\0';
+	s[i - 1] = '\0';
 }
 
 /* ==========================================================================
@@ -257,40 +241,30 @@ void psmqt_gen_random_string
 
 char * psmqt_gen_queue_name
 (
-    char              *s,  /* generated name will be stored here */
-    size_t             l   /* length of the queue name */
+	char              *s,  /* generated name will be stored here */
+	size_t             l   /* length of the queue name */
 )
 {
-    s[0] = '/';
+	s[0] = '/';
 
-    /* limit length of queue name
-     */
+	/* limit length of queue name */
+	l = l > 32 ? 32 : l;
 
-    l = l > 32 ? 32 : l;
+	/* generate unique queue name until it is different than
+	 * gt_broker_name to prevent name clash */
+	for (;;)
+	{
+		psmqt_gen_random_string(s + 1, l - 1);
 
-    /* generate unique queue name until it is different than
-     * gt_broker_name to prevent name clash
-     */
+		/* we are generating name for broker, so
+		 * no need to check for clash */
+		if (s == gt_broker_name)
+			break;
 
-    for (;;)
-    {
-        psmqt_gen_random_string(s + 1, l - 1);
-
-        if (s == gt_broker_name)
-        {
-            /* we are generating name for broker, so no need to
-             * check for clash
-             */
-
-            break;
-        }
-
-        if (strcmp(s, gt_broker_name) != 0)
-        {
-            break;
-        }
-    }
-    return s;
+		if (strcmp(s, gt_broker_name) != 0)
+			break;
+	}
+	return s;
 }
 
 
@@ -302,42 +276,40 @@ char * psmqt_gen_queue_name
 
 void psmqt_gen_unique_queue_name_array
 (
-    void    *array,  /* array to generate */
-    size_t   alen,   /* number of elements in array */
-    size_t   qlen    /* length of single string in array */
+	void    *array,  /* array to generate */
+	size_t   alen,   /* number of elements in array */
+	size_t   qlen    /* length of single string in array */
 )
 {
-    size_t   i;      /* iterator */
-    size_t   j;      /* yet another iterator */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	size_t   i;      /* iterator */
+	size_t   j;      /* yet another iterator */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    for (i = 0; i != alen; ++i)
-    {
-        char  *a;
-        /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	for (i = 0; i != alen; ++i)
+	{
+		char  *a;
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-        a = (char *)array + (i * qlen);
-        psmqt_gen_queue_name(a, qlen);
+		a = (char *)array + (i * qlen);
+		psmqt_gen_queue_name(a, qlen);
 
-        for (j = 0; j != i; ++j)
-        {
-            char  *b;
-            /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+		for (j = 0; j != i; ++j)
+		{
+			char  *b;
+			/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-            b = (char *)array + (j * qlen);
-            if (strcmp(a, b) == 0)
-            {
-                /* name clash! decrement i, and force another
-                 * name generation
-                 */
-
-                --i;
-                break;
-            }
-        }
-    }
+			b = (char *)array + (j * qlen);
+			if (strcmp(a, b) == 0)
+			{
+				/* name clash! decrement i, and
+				 * force another name generation */
+				--i;
+				break;
+			}
+		}
+	}
 }
 
 
@@ -349,23 +321,23 @@ void psmqt_gen_unique_queue_name_array
 
 int psmqt_msg_receiver
 (
-    char             *topic,         /* topic of data received from broker */
-    void             *payload,       /* data received from broker */
-    size_t            paylen,        /* size of the payload */
-    unsigned int      prio,          /* received message priority */
-    void             *arg            /* list where to put data onto */
+	char             *topic,         /* topic of data received from broker */
+	void             *payload,       /* data received from broker */
+	size_t            paylen,        /* size of the payload */
+	unsigned int      prio,          /* received message priority */
+	void             *arg            /* list where to put data onto */
 )
 {
-    struct psmq_msg  *msg;
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmq_msg  *msg;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-    (void)prio;
+	(void)prio;
 
-    msg = arg;
-    strcpy(msg->topic, topic);
-    memcpy(msg->payload, payload, paylen);
-    msg->paylen = paylen;
-    return 0;
+	msg = arg;
+	strcpy(msg->topic, topic);
+	memcpy(msg->payload, payload, paylen);
+	msg->paylen = paylen;
+	return 0;
 }
 
 
@@ -375,7 +347,7 @@ int psmqt_msg_receiver
 
 void psmqt_prepare_test(void)
 {
-    mt_assert(psmqt_run_default() == 0);
+	mt_assert(psmqt_run_default() == 0);
 }
 
 
@@ -385,27 +357,25 @@ void psmqt_prepare_test(void)
 
 void psmqt_prepare_test_with_clients(void)
 {
-    mt_assert(psmqt_run_default() == 0);
-    psmqt_gen_queue_name(gt_pub_name, sizeof(gt_pub_name));
+	mt_assert(psmqt_run_default() == 0);
+	psmqt_gen_queue_name(gt_pub_name, sizeof(gt_pub_name));
 
-    /* prevent queue name clashes, generate name until it is
-     * different than pub queue name
-     */
+	/* prevent queue name clashes, generate name until it is
+	 * different than pub queue name
+	 */
 
-    for (;;)
-    {
-        psmqt_gen_queue_name(gt_sub_name, sizeof(gt_sub_name));
+	for (;;)
+	{
+		psmqt_gen_queue_name(gt_sub_name, sizeof(gt_sub_name));
 
-        if (strcmp(gt_sub_name, gt_pub_name) != 0)
-        {
-            break;
-        }
-    }
+		if (strcmp(gt_sub_name, gt_pub_name) != 0)
+			break;
+	}
 
-    mt_fok(psmq_init(&gt_pub_psmq, gt_broker_name, gt_pub_name, 10));
-    mt_fok(psmq_init(&gt_sub_psmq, gt_broker_name, gt_sub_name, 10));
-    mt_fok(psmq_subscribe(&gt_sub_psmq, "/t"));
-    mt_fok(psmq_enable(&gt_sub_psmq, 1));
+	mt_fok(psmq_init(&gt_pub_psmq, gt_broker_name, gt_pub_name, 10));
+	mt_fok(psmq_init(&gt_sub_psmq, gt_broker_name, gt_sub_name, 10));
+	mt_fok(psmq_subscribe(&gt_sub_psmq, "/t"));
+	mt_fok(psmq_enable(&gt_sub_psmq, 1));
 }
 
 
@@ -415,15 +385,15 @@ void psmqt_prepare_test_with_clients(void)
 
 void psmqt_cleanup_test(void)
 {
-    int *ret;
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	int *ret;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    pthread_kill(gt_psmqd_t, SIGTERM);
-    pthread_join(gt_psmqd_t, (void **)&ret);
-    mq_unlink(gt_broker_name);
-    mt_fail(*ret == 0);
-    free(ret);
+	pthread_kill(gt_psmqd_t, SIGTERM);
+	pthread_join(gt_psmqd_t, (void **)&ret);
+	mq_unlink(gt_broker_name);
+	mt_fail(*ret == 0);
+	free(ret);
 }
 
 
@@ -433,18 +403,18 @@ void psmqt_cleanup_test(void)
 
 void psmqt_cleanup_test_with_clients(void)
 {
-    int *ret;
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	int *ret;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    pthread_kill(gt_psmqd_t, SIGTERM);
-    pthread_join(gt_psmqd_t, (void **)&ret);
-    mq_unlink(gt_broker_name);
-    mt_fail(*ret == 0);
-    free(ret);
+	pthread_kill(gt_psmqd_t, SIGTERM);
+	pthread_join(gt_psmqd_t, (void **)&ret);
+	mq_unlink(gt_broker_name);
+	mt_fail(*ret == 0);
+	free(ret);
 
-    mt_fok(psmq_cleanup(&gt_pub_psmq));
-    mt_fok(psmq_cleanup(&gt_sub_psmq));
-    mq_unlink(gt_pub_name);
-    mq_unlink(gt_sub_name);
+	mt_fok(psmq_cleanup(&gt_pub_psmq));
+	mt_fok(psmq_cleanup(&gt_sub_psmq));
+	mq_unlink(gt_pub_name);
+	mq_unlink(gt_sub_name);
 }

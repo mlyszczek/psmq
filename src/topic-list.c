@@ -60,31 +60,25 @@
 
 static struct psmqd_tl *psmqd_tl_find_node
 (
-    struct psmqd_tl  *head,  /* head of the list to search */
-    const char      *topic, /* topic to look for */
-    struct psmqd_tl **prev   /* previous node to returned node */
+	struct psmqd_tl  *head,  /* head of the list to search */
+	const char      *topic, /* topic to look for */
+	struct psmqd_tl **prev   /* previous node to returned node */
 )
 {
-    struct psmqd_tl  *node;  /* current node */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmqd_tl  *node;  /* current node */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    for (*prev = NULL, node = head; node != NULL; node = node->next)
-    {
-        if (strcmp(node->topic, topic) == 0)
-        {
-            /* this is the node you are looking for
-             */
-            return node;
-        }
+	for (*prev = NULL, node = head; node != NULL; node = node->next)
+	{
+		if (strcmp(node->topic, topic) == 0)
+			return node; /* this is the node you are looking for */
 
-        *prev = node;
-    }
+		*prev = node;
+	}
 
-    /* node of that topic does not exist
-     */
-
-    return NULL;
+	/* node of that topic does not exist */
+	return NULL;
 }
 
 
@@ -100,41 +94,32 @@ static struct psmqd_tl *psmqd_tl_find_node
 
 static struct psmqd_tl *psmqd_tl_new_node
 (
-    const char      *topic  /* topic to create new node with */
+	const char      *topic  /* topic to create new node with */
 )
 {
-    struct psmqd_tl  *node;  /* pointer to new node */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmqd_tl  *node;  /* pointer to new node */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    /* allocate enough memory for topic (plus 1 for null character)
-     * and node in one malloc(), this way we will have only 1
-     * allocation (for node and string) instead of 2.
-     */
+	/* allocate enough memory for topic (plus 1 for null character)
+	 * and node in one malloc(), this way we will have only 1
+	 * allocation (for node and string) instead of 2.  */
+	node = malloc(sizeof(struct psmqd_tl) + strlen(topic) + 1);
+	if (node == NULL)
+		return NULL;
 
-    node = malloc(sizeof(struct psmqd_tl) + strlen(topic) + 1);
-    if (node == NULL)
-    {
-        return NULL;
-    }
+	/* point topic member to where string really is, that is right
+	 * after struct psmqd_tl.  */
+	node->topic = ((char *)node) + sizeof(struct psmqd_tl);
 
-    /* point topic member to where string really is, that is right
-     * after struct psmqd_tl.
-     */
+	/* make a copy of topic */
+	strcpy(node->topic, topic);
 
-    node->topic = ((char *)node) + sizeof(struct psmqd_tl);
+	/* since this is new node, it
+	 * doesn't point to anything */
+	node->next = NULL;
 
-    /* make a copy of topic
-     */
-
-    strcpy(node->topic, topic);
-
-    /* since this is new node, it doesn't point to anything
-     */
-
-    node->next = NULL;
-
-    return node;
+	return node;
 }
 
 
@@ -172,78 +157,73 @@ static struct psmqd_tl *psmqd_tl_new_node
 
 int psmqd_tl_add
 (
-    struct psmqd_tl **head,   /* head of list where to add new node to */
-    const char       *topic   /* topic for new node */
+	struct psmqd_tl **head,   /* head of list where to add new node to */
+	const char       *topic   /* topic for new node */
 )
 {
-    struct psmqd_tl  *node;   /* newly created node */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmqd_tl  *node;   /* newly created node */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, head);
-    VALID(EINVAL, topic);
+	VALID(EINVAL, head);
+	VALID(EINVAL, topic);
 
-    /* create new node, let's call it 3
-     *
-     *           +---+
-     *           | 3 |
-     *           +---+
-     *
-     *      +---+     +---+
-     *      | 1 | --> | 2 |
-     *      +---+     +---+
-     */
+	/* create new node, let's call it 3
+	 *
+	 *           +---+
+	 *           | 3 |
+	 *           +---+
+	 *
+	 *      +---+     +---+
+	 *      | 1 | --> | 2 |
+	 *      +---+     +---+
+	 */
+	node = psmqd_tl_new_node(topic);
+	if (node == NULL)
+		return -1;
 
-    node = psmqd_tl_new_node(topic);
-    if (node == NULL)
-    {
-        return -1;
-    }
+	if (*head == NULL)
+	{
+		/* head is null, so list is empty and we
+		 * are creating new list here. In that
+		 * case, simply set *head with newly
+		 * created node and exit */
+		*head = node;
+		return 0;
+	}
 
-    if (*head == NULL)
-    {
-        /* head is null, so list is empty and we are creating
-         * new list here. In that case, simply set *head with
-         * newly created node and exit
-         */
+	/* set new node's next field, to second item
+	 * in the list, if there is no second item, it
+	 * will point to NULL
+	 *
+	 *           +---+
+	 *           | 3 |
+	 *           +---+.
+	 *                 \
+	 *                 |
+	 *                 V
+	 *      +---+     +---+
+	 *      | 1 | --> | 2 |
+	 *      +---+     +---+
+	 */
+	node->next = (*head)->next;
 
-        *head = node;
-        return 0;
-    }
+	/* set head's next to point to newly created
+	 * node so our list is complete once again.
+	 *
+	 *           +---+
+	 *           | 3 |
+	 *           +---+.
+	 *           ^     \
+	 *           |     |
+	 *          /      V
+	 *      +---+     +---+
+	 *      | 1 |     | 2 |
+	 *      +---+     +---+
+	 */
+	(*head)->next = node;
 
-    /* set new node's next field, to second item in the list,
-     * if there is no second item, it will point to NULL
-     *
-     *           +---+
-     *           | 3 |
-     *           +---+
-     *                 \
-     *                 |
-     *                 V
-     *      +---+     +---+
-     *      | 1 | --> | 2 |
-     *      +---+     +---+
-     */
-
-    node->next = (*head)->next;
-
-    /* set head's next to point to newly created node so our
-     * list is complete once again.
-     *
-     *           +---+
-     *           | 3 |
-     *           +---+
-     *           ^    \
-     *           |     |
-     *          /      V
-     *      +---+     +---+
-     *      | 1 |     | 2 |
-     *      +---+     +---+
-     */
-
-    (*head)->next = node;
-
-    return 0;
+	return 0;
 }
 
 
@@ -260,88 +240,84 @@ int psmqd_tl_add
 
 int psmqd_tl_delete
 (
-    struct psmqd_tl **head,       /* pointer to head of the list */
-    const char      *topic       /* node with that topic to delete */
+	struct psmqd_tl **head,       /* pointer to head of the list */
+	const char      *topic        /* node with that topic to delete */
 )
 {
-    struct psmqd_tl  *node;       /* found node for with 'topic' */
-    struct psmqd_tl  *prev_node;  /* previous node of found 'node' */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmqd_tl  *node;       /* found node for with 'topic' */
+	struct psmqd_tl  *prev_node;  /* previous node of found 'node' */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-    VALID(EINVAL, head);
-    VALID(ENOENT, *head);
-    VALID(EINVAL, topic);
+	VALID(EINVAL, head);
+	VALID(ENOENT, *head);
+	VALID(EINVAL, topic);
 
-    node = psmqd_tl_find_node(*head, topic, &prev_node);
-    if (node == NULL)
-    {
-        /* cannot delete node with name 'topic' because such node
-         * does not exist
-         */
+	node = psmqd_tl_find_node(*head, topic, &prev_node);
+	if (node == NULL)
+	{
+		/* cannot delete node with name 'topic'
+		 * because such node does not exist */
+		errno = ENOENT;
+		return -1;
+	}
 
-        errno = ENOENT;
-        return -1;
-    }
+	/* initial state of the list
+	 *
+	 *            +---+     +---+     +---+
+	 *   head --> | 1 | --> | 3 | --> | 2 |
+	 *            +---+     +---+     +---+
+	 */
 
-    /* initial state of the list
-     *
-     *            +---+     +---+     +---+
-     *   head --> | 1 | --> | 3 | --> | 2 |
-     *            +---+     +---+     +---+
-     */
+	if (node == *head)
+	{
+		/* caller wants to delete node that is
+		 * currently head node, so we need to
+		 * remove head, and them make head->next
+		 * new head of the list
+		 *
+		 *            +---+          +---+     +---+
+		 *   node --> | 1 | head --> | 3 | --> | 2 |
+		 *            +---+          +---+     +---+
+		 */
+		*head = node->next;
 
-    if (node == *head)
-    {
-        /* caller wants to delete node that is currently head node,
-         * so we need to remove head, and them make head->next new
-         * head of the list
-         *
-         *            +---+          +---+     +---+
-         *   node --> | 1 | head --> | 3 | --> | 2 |
-         *            +---+          +---+     +---+
-         */
+		/* now '1' is detached from anything and
+		 * can be safely freed */
+		free(node);
+		return 0;
+	}
 
-        *head = node->next;
+	/* node points to something else than 'head'
+	 *
+	 *            +---+     +---+     +---+     +---+
+	 *   head --> | 1 | --> | 3 | --> | 2 | --> | 4 |
+	 *            +---+     +---+     +---+     +---+
+	 *                                 ^
+	 *                                 |
+	 *                                node
+	 *
+	 * before deleting, we need to make sure '3'
+	 * (prev node) points to '4'. If node points
+	 * to last element '4', then we will set next
+	 * member of '2' element to null.
+	 *
+	 *            +---+     +---+     +---+
+	 *   head --> | 1 | --> | 3 | --> | 4 |
+	 *            +---+     +---+     +---+
+	 *                                 ^
+	 *                                 |
+	 *                      +---+     /
+	 *             node --> | 2 | ---`
+	 *                      +---+
+	 */
+	prev_node->next = node->next;
 
-        /* now '1' is detached from anything and can be safely freed
-         */
+	/* now that list is consistent again, we can
+	 * remove node (2) without destroying list */
 
-        free(node);
-        return 0;
-    }
-
-    /* node points to something else than 'head'
-     *
-     *            +---+     +---+     +---+     +---+
-     *   head --> | 1 | --> | 3 | --> | 2 | --> | 4 |
-     *            +---+     +---+     +---+     +---+
-     *                                 ^
-     *                                 |
-     *                                node
-     *
-     * before deleting, we need to make sure '3' (prev node) points
-     * to '4'. If node points to last element '4', then we will set
-     * next member of '2' element to null.
-     *
-     *            +---+     +---+     +---+
-     *   head --> | 1 | --> | 3 | --> | 4 |
-     *            +---+     +---+     +---+
-     *                                 ^
-     *                                 |
-     *                      +---+     /
-     *             node --> | 2 | ---`
-     *                      +---+
-     */
-
-    prev_node->next = node->next;
-
-    /* now that list is consistent again, we can remove node (2)
-     * without destroying list
-     */
-
-    free(node);
-    return 0;
+	free(node);
+	return 0;
 }
 
 
@@ -354,19 +330,19 @@ int psmqd_tl_delete
 
 int psmqd_tl_destroy
 (
-    struct psmqd_tl *head  /* list to destroy */
+	struct psmqd_tl *head  /* list to destroy */
 )
 {
-    struct psmqd_tl *next; /* next node to free() */
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	struct psmqd_tl *next; /* next node to free() */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-    VALID(EINVAL, head);
+	VALID(EINVAL, head);
 
-    for (;head != NULL; head = next)
-    {
-        next = head->next;
-        free(head);
-    }
+	for (;head != NULL; head = next)
+	{
+		next = head->next;
+		free(head);
+	}
 
-    return 0;
+	return 0;
 }

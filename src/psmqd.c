@@ -54,12 +54,12 @@
 
 static void sigint_handler
 (
-    int signo   /* signal that triggered this handler */
+	int signo   /* signal that triggered this handler */
 )
 {
-    (void)signo;
+	(void)signo;
 
-    g_psmqd_shutdown = 1;
+	g_psmqd_shutdown = 1;
 }
 
 #endif
@@ -81,99 +81,88 @@ int main
 int psmqd_main
 #endif
 (
-    int               argc,    /* number of arguments in argv */
-    char             *argv[]   /* arguments from command line */
+	int               argc,    /* number of arguments in argv */
+	char             *argv[]   /* arguments from command line */
 )
 {
 #if PSMQ_NO_SIGNALS == 0
-    {
-        struct sigaction  sa;      /* signal action instructions */
-        /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+	{
+		struct sigaction  sa;      /* signal action instructions */
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-        /* install signal handler to nicely exit program
-         */
-
-        memset(&sa, 0, sizeof(sa));
-        sa.sa_handler = sigint_handler;
-        sigaction(SIGINT, &sa, NULL);
-        sigaction(SIGTERM, &sa, NULL);
-    }
+		/* install signal handler to nicely exit program */
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_handler = sigint_handler;
+		sigaction(SIGINT, &sa, NULL);
+		sigaction(SIGTERM, &sa, NULL);
+	}
 #endif
 
-    g_psmqd_shutdown = 0;
+	g_psmqd_shutdown = 0;
 
-    switch (psmqd_cfg_init(argc, argv))
-    {
-    case 0:
-        /* no errors in parsing arguments, continue program execution
-         */
+	switch (psmqd_cfg_init(argc, argv))
+	{
+	case 0:
+		/* no errors in parsing arguments,
+		 * continue program execution */
+		break;
 
-        break;
+	case -2:
+	case -3:
+		/* help or version was printed, exit
+		 * program without error */
+		return 0;
 
-    case -2:
-    case -3:
-        /* help or version was printed, exit program without error
-         */
-
-        return 0;
-
-    default:
-        /* error occured when parsing arguments, die
-         */
-
-        return 1;
-    }
+	default:
+		/* error occured when parsing arguments,
+		 * die */
+		return 1;
+	}
 
 #if PSMQ_ENABLE_DAEMON
-    if (g_psmqd_cfg.daemonize)
-    {
-        daemonize(g_psmqd_cfg.pid_file, g_psmqd_cfg.user, g_psmqd_cfg.group);
-    }
+	if (g_psmqd_cfg.daemonize)
+		daemonize(g_psmqd_cfg.pid_file, g_psmqd_cfg.user, g_psmqd_cfg.group);
 #endif
 
-    /* configure logger for diagnostic logs
-     */
+	/* configure logger for diagnostic logs */
+	el_oinit(&g_psmqd_log);
+	el_ooption(&g_psmqd_log, EL_LEVEL, g_psmqd_cfg.log_level);
+	el_ooption(&g_psmqd_log, EL_TS, EL_TS_LONG);
+	el_ooption(&g_psmqd_log, EL_TS_TM, EL_TS_TM_REALTIME);
+	el_ooption(&g_psmqd_log, EL_FINFO, 1);
+	el_ooption(&g_psmqd_log, EL_COLORS, g_psmqd_cfg.colorful_output);
+	el_ooption(&g_psmqd_log, EL_FILE_SYNC_EVERY, 0);
+	el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_STDERR);
 
-    el_oinit(&g_psmqd_log);
-    el_ooption(&g_psmqd_log, EL_LEVEL, g_psmqd_cfg.log_level);
-    el_ooption(&g_psmqd_log, EL_TS, EL_TS_LONG);
-    el_ooption(&g_psmqd_log, EL_TS_TM, EL_TS_TM_REALTIME);
-    el_ooption(&g_psmqd_log, EL_FINFO, 1);
-    el_ooption(&g_psmqd_log, EL_COLORS, g_psmqd_cfg.colorful_output);
-    el_ooption(&g_psmqd_log, EL_FILE_SYNC_EVERY, 0);
-    el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_STDERR);
+	if (g_psmqd_cfg.program_log)
+	{
+		/* save logs to file if that file is specified */
+		el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_FILE);
 
-    if (g_psmqd_cfg.program_log)
-    {
-        /* save logs to file if that file is specified
-         */
+		if (el_ooption(&g_psmqd_log, EL_FPATH, g_psmqd_cfg.program_log) != 0)
+		{
+			fprintf(stderr, "w/couldn't open program log file %s: %s "
+					"logs will be printed to stderr\n",
+					g_psmqd_cfg.program_log,  strerror(errno));
+			el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_STDERR);
+		}
+	}
 
-        el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_FILE);
+	psmqd_cfg_print();
 
-        if (el_ooption(&g_psmqd_log, EL_FPATH, g_psmqd_cfg.program_log) != 0)
-        {
-            fprintf(stderr, "w/couldn't open program log file %s: %s "
-                "logs will be printed to stderr\n",
-                g_psmqd_cfg.program_log,  strerror(errno));
-            el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_STDERR);
-        }
-    }
+	if (psmqd_broker_init() != 0)
+	{
+		el_oprint(ELF, &g_psmqd_log, "failed to initialize broker");
+		goto broker_init_error;
+	}
 
-    psmqd_cfg_print();
+	psmqd_broker_start();
+	psmqd_broker_cleanup();
 
-    if (psmqd_broker_init() != 0)
-    {
-        el_oprint(ELF, &g_psmqd_log, "failed to initialize broker");
-        goto broker_init_error;
-    }
-
-    psmqd_broker_start();
-    psmqd_broker_cleanup();
-
-    el_oprint(ELN, &g_psmqd_log, "exiting psmqd");
+	el_oprint(ELN, &g_psmqd_log, "exiting psmqd");
 
 broker_init_error:
-    el_ocleanup(&g_psmqd_log);
-    return 0;
+	el_ocleanup(&g_psmqd_log);
+	return 0;
 }
