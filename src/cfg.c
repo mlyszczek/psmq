@@ -231,11 +231,6 @@ void psmqd_cfg_print(void)
 #define CONFIG_PRINT_VAR(var, type) \
 		el_oprint(OELN, "%s%s "type, #var, padder + strlen(#var), var)
 
-#define PSMQ_MSG_TOPIC size_of_member(struct psmq_msg, topic)
-#define PSMQ_MSG_PAYLOAD size_of_member(struct psmq_msg, payload)
-#define PSMQ_MSG_PUB_TOPIC size_of_member(struct psmq_msg_pub, topic)
-#define PSMQ_MSG_PUB_PAYLOAD size_of_member(struct psmq_msg_pub, payload)
-
 	char padder[] = "............................:";
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -251,12 +246,8 @@ void psmqd_cfg_print(void)
 	CONFIG_PRINT(broker_name, "%s");
 	CONFIG_PRINT(broker_maxmsg, "%d");
 	CONFIG_PRINT(remove_queue, "%d");
-	CONFIG_PRINT_VAR(PSMQ_MSG_TOPIC, "%d");
-	CONFIG_PRINT_VAR(PSMQ_MSG_PAYLOAD, "%d");
-	CONFIG_PRINT_VAR(PSMQ_MSG_PUB_TOPIC, "%d");
-	CONFIG_PRINT_VAR(PSMQ_MSG_PUB_PAYLOAD, "%d");
+	CONFIG_PRINT_VAR(PSMQ_MSG_MAX, "%u");
 	CONFIG_PRINT_VAR(sizeof(struct psmq_msg), "%lu");
-	CONFIG_PRINT_VAR(sizeof(struct psmq_msg_pub), "%lu");
 
 #undef CONFIG_PRINT
 }

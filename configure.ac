@@ -118,34 +118,18 @@ AS_IF([test $PSMQ_MAX_CLIENTS -lt 2],
 ])
 
 ###
-# PSMQ_TOPIC_MAX
+# PSMQ_MSG_MAX
 #
 
 
-AC_ARG_VAR([PSMQ_TOPIC_MAX], [Maximum length of topic])
-AS_IF([test "x$PSMQ_TOPIC_MAX" = x], [PSMQ_TOPIC_MAX="255"])
-AC_DEFINE_UNQUOTED([PSMQ_TOPIC_MAX], [$PSMQ_TOPIC_MAX], [Maximum length of topic])
+AC_ARG_VAR([PSMQ_MSG_MAX], [Maximum length of message (topic + payload)])
+AS_IF([test "x$PSMQ_MSG_MAX" = x], [PSMQ_MSG_MAX="255"])
+AC_DEFINE_UNQUOTED([PSMQ_MSG_MAX], [$PSMQ_MSG_MAX], [Maximum length of message (topic + payload])
 
-AS_IF([test $PSMQ_TOPIC_MAX -lt 2],
+AS_IF([test $PSMQ_MSG_MAX -lt 9],
 [
-    AC_MSG_ERROR(PSMQ_TOPIC_MAX must be at least 2)
+    AC_MSG_ERROR(PSMQ_MSG_MAX must be at least 9)
 ])
-
-
-###
-# PSMQ_PAYLOAD_MAX
-#
-
-
-AC_ARG_VAR([PSMQ_PAYLOAD_MAX], [Maximum length of payload])
-AS_IF([test "x$PSMQ_PAYLOAD_MAX" = x], [PSMQ_PAYLOAD_MAX="256"])
-AC_DEFINE_UNQUOTED([PSMQ_PAYLOAD_MAX], [$PSMQ_PAYLOAD_MAX], [Maximum length of payload])
-
-AS_IF([test $PSMQ_PAYLOAD_MAX -lt 2],
-[
-    AC_MSG_ERROR(PSMQ_PAYLOAD_MAX must be at least 2)
-])
-
 
 AC_OUTPUT
 
@@ -156,5 +140,4 @@ echo "build standalone.........: $enable_standalone"
 echo "build library............: $enable_library"
 echo ""
 echo "max clients............. : $PSMQ_MAX_CLIENTS"
-echo "max topic length........ : $PSMQ_TOPIC_MAX"
-echo "max payload length...... : $PSMQ_PAYLOAD_MAX"
+echo "max message size........ : $PSMQ_MSG_MAX"

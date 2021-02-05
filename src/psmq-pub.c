@@ -99,7 +99,7 @@ static void send_stdin
 	unsigned int  prio    /* message priority */
 )
 {
-	char          line[PSMQ_PAYLOAD_MAX];  /* single line read from stdin */
+	char          line[PSMQ_MSG_MAX];  /* single line read from stdin */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -288,9 +288,8 @@ int psmq_pub_main
 			break;
 
 		case ENAMETOOLONG:
-			fprintf(stderr, "f/queue name is too long (%lu), max is %lu\n",
-					(unsigned long)strlen(qname),
-					(unsigned long)size_of_member(struct psmq_msg_pub, payload) - 1);
+			fprintf(stderr, "f/queue name is too long (%lu), max is %u\n",
+					(unsigned long)strlen(qname), PSMQ_MSG_MAX);
 			break;
 		}
 

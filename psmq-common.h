@@ -14,122 +14,99 @@
 #include <stddef.h>
 #include <errno.h>
 
-
 /* hard limits, these are minimal values that either makes sense or
  * psmq cannot properly work with different values that these or
- * internal types forbids some values to be bigger
+ * internal types forbids some values to be bigger */
+
+/* psmq reserves 5 bytes in psmq_msg buffer for control
+ * messages. Request control messages can take up to 7 bytes.
+ * Format of request control message is "xNNN\0", where "x" is a
+ * command, and "NNN" is a file descriptor of a client.  "N"
+ * would be enough when there is less than 10 clients, but we
+ * support up to 256 clients so to prevent any bugs, we force max
+ * value here. Control topic must always end with null character.
+ *
+ * When broker sends back reply, topic is in format "x\0", so we
+ * are well within 5 bytes reserved for request.
  */
-
-#define PSMQ_MAX_CLIENTS_HARD_MAX 999
-#define PSMQ_MAX_CLIENTS_HARD_MIN   2
-#define PSMQ_PAYLOAD_MAX_HARD_MIN   2
-#define PSMQ_TOPIC_MAX_HARD_MIN     2
-
-#if PSMQ_PAYLOAD_MAX < PSMQ_PAYLOAD_MAX_HARD_MIN
-    /* couple of control messages will send 2 bytes, for example,
-     * open will send ack in byte 1 and file descriptor in byte 2
-     */
-#   error PSMQ_PAYLOAD_MAX must be at least 2 bytes big
-#endif
-
-#if PSMQ_TOPIC_MAX < PSMQ_TOPIC_MAX_HARD_MIN
-    /* all topics should start with '/', so it is rather pointless
-     * to set this value to 1, you won't create one topic with '/'
-     * only, will you?
-     */
-#   error PSMQ_TOPIC_MAX must be at least 2 bytes big
-#endif
+#define PSMQ_CTRL_LEN 7
 
 #if PSMQ_MAX_CLIENTS > (UCHAR_MAX - 1)
-    /* psmq uses unsigned char to hold, and transmit client's file
-     * descriptors, so you cannot set max clients to be bigger than
-     * what unsigned char can hold. -1 is because UCHAR_MAX is
-     * reserved for errors.
-     */
-#   error PSMQ_MAX_CLIENTS must not be bigger than UCHAR_MAX
+	/* psmq uses unsigned char to hold, and transmit client's file
+	 * descriptors, so you cannot set max clients to be bigger than
+	 * what unsigned char can hold. -1 is because UCHAR_MAX is
+	 * reserved for errors. */
+#   error PSMQ_MAX_CLIENTS must not be bigger than (UCHAR_MAX - 1)
 #endif
 
+#define PSMQ_MAX_CLIENTS_HARD_MAX 999
 #if PSMQ_MAX_CLIENTS > PSMQ_MAX_CLIENTS_HARD_MAX
-    /* some systems might have char size 10bits or bigger, but even
-     * them cannot go beyond hard max clients
-     */
-#   error PSMQ_MAX_CLIENTS must not be bigger than PSMQ_MAX_CLIENTS_HARD_MAX
+	/* some systems might have char size 10bits or bigger, but even
+	 * then, we cannot go beyond 999 clients, which is 9bytes long
+	 * in string representation. */
+#   error PSMQ_MAX_CLIENTS must not be bigger than 999
 #endif
 
+#define PSMQ_MAX_CLIENTS_HARD_MIN 2
 #if PSMQ_MAX_CLIENTS < PSMQ_MAX_CLIENTS_HARD_MIN
-    /* psmq is a publish subscriber program, so at least one client
-     * must publish and one should receive messages, it is really
-     * pointless to have only one publisher or one subscriber, thus
-     * this error
-     */
-#   error PSMQ_MAX_CLIENTS must be bigger than PSMQ_MAX_CLIENTS_HARD_MIN
+	/* psmq is a publish subscriber program, so at least one client
+	 * must publish and one should receive messages, it is really
+	 * pointless to have only one publisher or one subscriber, thus
+	 * this error */
+#   error PSMQ_MAX_CLIENTS must be bigger than 1
 #endif
 
-#define PSMQ_MAX(a, b) ((a) > (b) ? (a) : (b))
 #define size_of_member(type, member) sizeof(((type *)0)->member)
+/* calculates real size of msg to send over, real that is, if
+ * data[PSMQ_MSG_MAX] is 50, topic is 10 bytes long and payload is 4
+ * bytes long, there is no need to send whole struct with 50 bytes,
+ * when more than half of it are going to be useless bytes. This macro
+ * will calculate number of bytes that are actual usefull and that
+ * should be transfered over. Note: m argument, must be validated,
+ * that is, data[] must have at least on null termination (topic)
+ * or paylen must be 0 and data[0] = '\0'. */
+#define psmq_real_msg_size(m) (sizeof((m).paylen) + sizeof((m).ctrl) + \
+		strlen((m).data) + 1 + (m).paylen)
 
-#define PSMQ_TOPIC_OPEN        "-o"
-#define PSMQ_TOPIC_CLOSE       "-c"
-#define PSMQ_TOPIC_SUBSCRIBE   "-s"
-#define PSMQ_TOPIC_UNSUBSCRIBE "-u"
-#define PSMQ_TOPIC_ENABLE      "-e"
-#define PSMQ_TOPIC_DISABLE     "-d"
-/* it's 3 because some messages also contains file descriptor in
- * which case, controll topic will be "-X/" after which comes file
- * descriptor
- */
-#define PSMQ_CTRL_TOPIC_LEN    3
+#define PSMQ_CTRL_CMD_OPEN        'o'
+#define PSMQ_CTRL_CMD_CLOSE       'c'
+#define PSMQ_CTRL_CMD_SUBSCRIBE   's'
+#define PSMQ_CTRL_CMD_UNSUBSCRIBE 'u'
+#define PSMQ_CTRL_CMD_ENABLE      'e'
+#define PSMQ_CTRL_CMD_DISABLE     'd'
+#define PSMQ_CTRL_CMD_PUBLISH     'p'
 
-/* how many space will maximum client take in string, 256 is 3
- * chars, so 3. Also 999 is 3.
- */
-#define PSMQ_MAX_CLIENTS_STR_MAX 3
-
-/* this is minimum size of topic to hold essential control messages
- */
-
-#define PSMQ_TOPIC_WITH_FD  (PSMQ_CTRL_TOPIC_LEN + PSMQ_MAX_CLIENTS_STR_MAX)
-
-/* clients publishes to broker messages via this structure, both
- * control frames and ordinary topics are sent with it. Broker
- * creates one queue with sizeof(struct psmq_msg_pub) as msgsize.
- * If you set topic and payload size to some small values, which
- * will result in buffers being to small to carry essential
- * control messages, array in this struct will be enlarged
- * to keep psmq operational. You're welcome.
- */
-
-struct psmq_msg_pub
-{
-    /* message topic, this should be big enough to hold control topics
-     * (2 chars) and file descriptor information in format "/NNN"
-     * where NNN is fd, and that is 1 character (for '/') and
-     * number of digits calculated from hard limit
-     */
-
-    char          topic[PSMQ_MAX(PSMQ_TOPIC_WITH_FD, PSMQ_TOPIC_MAX) + 1];
-
-    /* payload can carry actual payload or topic (for subscribe),
-     * so pick whatever is bigger
-     */
-
-    unsigned char payload[PSMQ_MAX(PSMQ_PAYLOAD_MAX, PSMQ_TOPIC_MAX + 1)];
-    size_t        paylen;
-};
-
-/* broker sends messages to clients via this structure. Clients
- * when connecting to broker creates mqueue with sizeof(struct
- * psmq_msg) as msgsize, so it is worth keeping this to minimum,
- * since clients are many, and might send a lot of data between
- * them. There is no real restriction of array sizes, you can set
- * topic size to 1 and payload to 1 too if you wish.
- */
-
+/* broker and clients both use this structure to communicate with
+ * each other. psmq will create single mqueue with size of this
+ * structure and one for each connected client, so it's worth keeping
+ * it as small as possible. */
 struct psmq_msg
 {
-    char          topic[PSMQ_TOPIC_MAX + 1];
-    unsigned char payload[PSMQ_PAYLOAD_MAX];
-    size_t        paylen;
+	/* control messages are stored in this buffer */
+	struct ctrl
+	{
+		/* defines request command */
+		char  cmd;
+
+		/* during requst from the client, this holds file
+		 * descriptor of a client, an id to identify which client
+		 * is performing request
+		 *
+		 * during reply from the broker it hold request result
+		 * (0 for success or errno when error occured) */
+		unsigned char  data;
+	} ctrl;
+
+	/* length of payload data in msg, this contains only length of
+	 * data without topic. */
+	unsigned short  paylen;
+
+	/* data contains both topic and payload. Topic must always be
+	 * null-terminated after which payload follows. This allows
+	 * for some flexibility, ie if PSMQ_MSG_MAX was be 10, then
+	 * topic could be 3 bytes long and payload 7, but also
+	 * topic could take 9 bytes and payload only 1. */
+	char  data[PSMQ_MSG_MAX];
 };
 
 #endif /* PSMQ_BROKER_H */

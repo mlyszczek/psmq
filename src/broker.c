@@ -116,7 +116,7 @@ static struct client  clients[PSMQ_MAX_CLIENTS]; /* array of clients */
    ========================================================================== */
 
 
-static int psmqd_broker_get_free_client(void)
+static unsigned char psmqd_broker_get_free_client(void)
 {
 	int  fd;  /* number of free slot in clients */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -127,7 +127,7 @@ static int psmqd_broker_get_free_client(void)
 			return fd; /* mq not set, slot available */
 
 	/* all slots are used */
-	return -1;
+	return UCHAR_MAX;
 }
 
 
@@ -144,12 +144,12 @@ static int psmqd_broker_topic_matches
 	const char  *sub_topic   /* client's subscribe topic (may contain * or + */
 )
 {
-	char         pubt[PSMQ_TOPIC_MAX + 1];  /* copy of pub_topic */
-	char         subt[PSMQ_TOPIC_MAX + 1];  /* copy of sub_topic */
 	char        *pubts;      /* saveptr of pubt for strtok_r */
 	char        *subts;      /* saveptr of subt for strtok_r */
 	char        *pubtok;     /* current token of pub topic */
 	char        *subtok;     /* current token of sub topic */
+	char         pubt[PSMQ_MSG_MAX];  /* copy of pub_topic */
+	char         subt[PSMQ_MSG_MAX];  /* copy of sub_topic */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -254,21 +254,33 @@ static int psmqd_broker_topic_matches
 static int psmqd_broker_reply_mq
 (
 	mqd_t            mq,       /* mqueue of client to send message to */
-	const char      *topic,    /* topic of the message */
+	char             cmd,      /* command to which reply applies */
+	unsigned char    data,     /* errno reply */
+	const char      *topic,    /* topic to send message with */
 	const void      *payload,  /* data to send to the client */
-	size_t           paylen,   /* length of payload to send */
+	unsigned         paylen,   /* length of payload to send */
 	unsigned int     prio      /* message priority */
 )
 {
 	struct psmq_msg  msg;      /* structure with message to send */
 	struct timespec  tp;       /* absolute time when mq_send() call expire */
+	unsigned         topiclen; /* length of topic */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
 	memset(&msg, 0x00, sizeof(msg));
-	strcpy(msg.topic, topic);
-	memcpy(msg.payload, payload, paylen);
+	msg.ctrl.cmd = cmd;
+	msg.ctrl.data = data;
 	msg.paylen = paylen;
+	topiclen = 0;
+
+	if (topic)
+	{
+		topiclen = strlen(topic) + 1;
+		strcpy(msg.data, topic);
+	}
+
+	memcpy(msg.data + topiclen, payload, paylen);
 
 	/* wait for up to 100ms for client to free
 	 * space in his mqueue */
@@ -281,7 +293,7 @@ static int psmqd_broker_reply_mq
 		tp.tv_nsec -= 1000000000l;
 	}
 
-	return mq_timedsend(mq, (const char *)&msg, sizeof(msg), prio, &tp);
+	return mq_timedsend(mq, (char *)&msg, psmq_real_msg_size(msg), prio, &tp);
 }
 
 
@@ -293,18 +305,37 @@ static int psmqd_broker_reply_mq
 static int psmqd_broker_reply
 (
 	int           fd,       /* fd of client to send message to */
-	const char   *topic,    /* topic of the message */
+	char          cmd,      /* command to which reply applies */
+	unsigned char data,     /* errno reply */
+	const char   *topic,    /* topic to send message with */
 	const void   *payload,  /* data to send to the client */
-	size_t        paylen,   /* length of payload to send */
+	unsigned      paylen,   /* length of payload to send */
 	unsigned int  prio      /* message priority */
 )
 {
-	return psmqd_broker_reply_mq(clients[fd].mq, topic, payload, paylen, prio);
+	return psmqd_broker_reply_mq(clients[fd].mq, cmd,
+			data,topic, payload, paylen, prio);
 }
 
 
 /* ==========================================================================
-    Extracts file decriptor information from msg->topic.
+    Same as psmqd_broker_reply_mq() but used to reply to control requests.
+    These replies holds no data but control bytes.
+   ========================================================================== */
+
+
+static int psmqd_broker_reply_ctrl
+(
+	int           fd,       /* fd of client to send message to */
+	char          cmd,      /* command to which reply applies */
+	unsigned char data      /* errno reply */
+)
+{
+	return psmqd_broker_reply(fd, cmd, data, NULL, NULL, 0, 0);
+}
+
+/* ==========================================================================
+    Extracts file decriptor information from msg
 
     Returns valid fd or UCHAR_MAX on errors.
    ========================================================================== */
@@ -312,19 +343,20 @@ static int psmqd_broker_reply
 
 static unsigned char psmqd_broker_get_fd
 (
-	struct psmq_msg_pub  *msg      /* message to read fd from */
+	struct psmq_msg  *msg      /* message to read fd from */
 )
 {
-	long                  fd;      /* fd converted from string */
-	char                 *fdstr;   /* received fd as string */
-	char                 *endptr;  /* error indicator for strol */
+	long              fd;      /* fd converted from string */
+	char             *fdstr;   /* received fd as string */
+	char             *endptr;  /* error indicator for strol */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
 	/* all control frames must have topic in form
 	 * "-X/NNN", where X is command character, and
-	 * NNN is clients file descriptor */
-	fdstr = msg->topic + 3;
+	 * NNN is clients file descriptor. First byte
+	 * of data is start of topic */
+	fdstr = msg->data + 3;
 
 	/* convert string file descriptor into int */
 	fd = strtol(fdstr, &endptr, 10);
@@ -348,6 +380,26 @@ static unsigned char psmqd_broker_get_fd
 
 
 /* ==========================================================================
+    Returns pointer to start of payload in msg->data buffer. If there is no
+    payload NULL is returned. Function does not perform any validation.
+   ========================================================================== */
+
+
+static void * psmqd_broker_get_payload
+(
+	struct psmq_msg  *msg  /* received message */
+)
+{
+	/* obviously there is no payload
+	 * when paylen is 0 */
+	if (msg->paylen == 0)
+		return NULL;
+
+	return msg->data + strlen(msg->data) + 1;
+}
+
+
+/* ==========================================================================
                                                        __
                 _____ ___   ____ _ __  __ ___   _____ / /_ _____
                / ___// _ \ / __ `// / / // _ \ / ___// __// ___/
@@ -362,15 +414,16 @@ static unsigned char psmqd_broker_get_fd
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     request:
-            topic       str     "-o"
-            payload     str     queue name where messages will be sent
+            ctrl.cmd    char    PSMQ_CTRL_CMD_OPEN
+            ctrl.data   uchar   ignored
+            data        str     queue name where messages will be sent
 
     response:
-            topic       str     "-o"
-            payload
-                error   uchar   0 no error or errno value
-                fd      uchar   file descriptor to use when communicating
-                                field is valid only when error is 0
+            ctrl.cmd    char    PSMQ_CTRL_CMD_OPEN
+            ctrl.data   uchar   0 on success, or errno
+            data
+                fd      uchar   file descriptor to use when communicating,
+                                field is valid only when ctrl.data is 0
 
     note:
             yes, errno is int, so max value of errno is 32767, but this is
@@ -385,20 +438,23 @@ static unsigned char psmqd_broker_get_fd
             is going to have 255 different processes with different psmq
             clients in their embedded systems. Btw, I know someone will hit
             this. If you happened to do so, you can freely email me and
-            laugh into my face for such riddiculus limitation.
+            laugh into my face for such ridiculous limitation.
    ========================================================================== */
 
 
 static int psmqd_broker_open
 (
-	char          *qname    /* name of the queue to communicate with client */
+	struct psmq_msg  *msg      /* msg with queue name to open */
 )
 {
-	mqd_t          qc;      /* new communication queue */
-	int            fd;      /* new file descriptor for the client */
-	unsigned char  buf[2];  /* buffer with response */
+	mqd_t             qc;      /* new communication queue */
+	unsigned char     fd;      /* new file descriptor for the client */
+	char             *qname;   /* queue name to open */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+	/* qname validated for null
+	 * termination during reception */
+	qname = msg->data;
 
 	/* open communication line with client */
 	qc = mq_open(qname, O_RDWR);
@@ -407,20 +463,16 @@ static int psmqd_broker_open
 		/* couldn't open queue provided by client and thus we have
 		 * no way of informing him about error, so we only log this
 		 * and abort this session */
-
 		el_operror(OELC, "open failed: mq_open(%s)", qname);
 		return -1;
 	}
 
 	fd = psmqd_broker_get_free_client();
-	if (fd == -1)
+	if (fd == UCHAR_MAX)
 	{
-		/* all slots are taken, send one int with error information
-		 * to the client */
-		buf[0] = (unsigned char)ENOSPC;
-		buf[1] = 0;
+		/* all slots are taken, send error information to the client */
 		el_oprint(OELW, "open failed client %s: no free slots", qname);
-		psmqd_broker_reply_mq(qc, PSMQ_TOPIC_OPEN, buf, sizeof(buf), 0);
+		psmqd_broker_reply_mq(qc, PSMQ_CTRL_CMD_OPEN, ENOSPC, NULL, NULL, 0, 0);
 		mq_close(qc);
 		return -1;
 	}
@@ -429,10 +481,7 @@ static int psmqd_broker_open
 
 	/* we have free slot and all data has been allocated, send
 	 * client file descriptor he can use to control communication */
-	buf[0] = 0;
-	buf[1] = fd;
-
-	psmqd_broker_reply_mq(qc, PSMQ_TOPIC_OPEN, buf, sizeof(buf), 0);
+	psmqd_broker_reply_mq(qc, PSMQ_CTRL_CMD_OPEN, 0, NULL, &fd, 1, 0);
 	el_oprint(OELN, "[%3d] opened %s", fd, qname);
 	return 0;
 }
@@ -443,54 +492,47 @@ static int psmqd_broker_open
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     request:
-            topic       str     "-s/NNN" where NNN is file descriptor
-            payload     str     topic to subscribe to
+            ctrl.cmd    char    PSMQ_CTRL_CMD_SUBSCRIBE
+            ctrl.data   uchar   file descriptor
+            data        str     topic to subscribe to
 
     response
-            topic       str     "-s"
-            payload     uchar   0 - subscribed, or errno value
+            ctrl.cmd    char    PSMQ_CTRL_CMD_SUBSCRIBE
+            ctrl.data   uchar   0 on success, otherwise errno
+            data        -       none
 
     errno for response:
-            EBADMSG     payload is not a string
+            EBADMSG     payload is not a string or not a valid topic
             UCHAR_MAX   returned errno from system is bigger than UCHAR_MAX
    ========================================================================== */
 
 
 static int psmqd_broker_subscribe
 (
-	struct psmq_msg_pub  *msg      /* subscription request */
+	struct psmq_msg  *msg         /* subscription request */
 )
 {
-	unsigned char         fd;      /* clients file descriptor */
-	unsigned char         err;     /* errno value to send to client */
-	char                 *stopic;  /* subscribe topic from client */
+	unsigned char     fd;         /* clients file descriptor */
+	unsigned char     err;        /* errno value to send to client */
+	char             *stopic;     /* subscribe topic from client */
+	char             *stopicsave; /* saved pointer of stopic */
+	unsigned          stopiclen;  /* length of stopic */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-
-	stopic = (char *)msg->payload;
-	fd = psmqd_broker_get_fd(msg);
-
-	/* if there was error reading clients file
-	 * descriptor, that means we cannot send error
-	 * message to client as we don't know who send
-	 * it to us. Warning log is printed in
-	 * psmqd_broker_get_fd() so we simply exit */
-	if (fd == UCHAR_MAX)
-		return -1;
-
+	fd = msg->ctrl.data;
+	stopic = msg->data;
+	stopiclen = strlen(stopic);
 	err = 0;
-	if (msg->paylen < 3)
+
+	if (stopiclen < 2)
 	{
-		el_oprint(OELW, "[%3d] subscribe error, topic '%s' too short %lu",
-				fd, stopic, msg->paylen);
+		el_oprint(OELW, "[%3d] subscribe error, topic '%s' too short %u",
+				fd, stopic, stopiclen);
 		err = EBADMSG;
 	}
-	else if (strlen(stopic) != msg->paylen - 1)
+	else if (msg->paylen != 0)
 	{
-		el_oprint(OELW,
-				"[%3d] subscribe error, topic length %d "
-				"doesn't match paylen (%lu - 1)",
-				fd, strlen(stopic), msg->paylen);
+		el_oprint(OELW, "[%3d] subscribe error, message contains extra data", fd);
 		err = EBADMSG;
 	}
 	else if (stopic[0] != '/')
@@ -499,84 +541,82 @@ static int psmqd_broker_subscribe
 				fd, stopic);
 		err = EBADMSG;
 	}
-	else if (stopic[msg->paylen - 2] == '/')
+	else if (stopic[stopiclen - 1] == '/')
 	{
 		el_oprint(OELW, "[%3d] subscribe error, topic %s cannot end with '/'",
 				fd, stopic);
 		err = EBADMSG;
 	}
-	else {
-		for (; *stopic != '\0'; ++stopic)
+	else
+	{
+		for (stopicsave = stopic; *stopic != '\0'; ++stopic)
 		{
 			if (*stopic == '/' && *(stopic + 1) == '/')
 			{
 				el_oprint(OELW, "[%3d] subscribe error, topic '%s' cannot "
-						"contain two '/' in a row", fd, (char *)msg->payload);
+						"contain two '/' in a row", fd, stopicsave);
 				err = EBADMSG;
 				break;
 			}
 		}
+
+		stopic = stopicsave;
 	}
 
 	if (err)
 	{
-		psmqd_broker_reply(fd, PSMQ_TOPIC_SUBSCRIBE, &err, sizeof(err), 0);
+		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, err);
 		return -1;
 	}
 
 
-	stopic = (char *)msg->payload;
 	if (psmqd_tl_add(&clients[fd].topics, stopic) != 0)
 	{
 		/* subscription failed */
 		err = errno < UCHAR_MAX ? errno : UCHAR_MAX;
 		el_operror(OELW, "[%3d] failed to add topic to list", fd);
-		psmqd_broker_reply(fd, PSMQ_TOPIC_SUBSCRIBE, &err, sizeof(err), 0);
+		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, err);
 		return -1;
 	}
 
 	err = 0;
-	psmqd_broker_reply(fd, PSMQ_TOPIC_SUBSCRIBE, &err, sizeof(err), 0);
+	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, 0);
 	el_oprint(OELN, "[%3d] subscribed to %s", fd, stopic);
 	return 0;
 }
 
 
 /* ==========================================================================
-    Enables or disables client to receive messages. After that message
+    Enables or disables client to receive messages. After that message, all
     messages matching client's subscribed topics will be sent to him or not
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     request:
-            topic       str     "-E/NNN" where E is 'e' or 'd' and
-                                    NNN is file descriptor
-            payload     -       none
+            ctrl.cmd    char    PSMQ_CTRL_CMD_ENABLE or PSMQ_CTRL_CMD_DISABLE
+            ctrl.data   uchar   file descriptor of the client
+            data        -       none
 
     response
-            topic       str     "-E" where E is 'e' or 'd'
-            payload     uchar   0 as in no errors
+            ctrl.cmd    char    PSMQ_CTRL_CMD_ENABLE or PSMQ_CTRL_CMD_DISABLE
+            ctrl.data   uchar   0 on success, otherwise errno
+            data        -       none
    ========================================================================== */
 
 
 static int psmqd_broker_enable
 (
-	struct psmq_msg_pub  *msg, /* messages request */
-	int                   en   /* enable or disable */
+	struct psmq_msg  *msg, /* messages request */
+	int               en   /* enable or disable */
 )
 {
-	unsigned char         fd;  /* client's file descriptor */
-	unsigned char         err; /* error to send to client as reply */
+	unsigned char     fd;  /* client's file descriptor */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	fd = psmqd_broker_get_fd(msg);
-	if (fd == UCHAR_MAX)
-		return -1;
-
+	fd = msg->ctrl.data;
 	clients[fd].enabled = en;
-	err = 0;
-	psmqd_broker_reply(fd, en ? PSMQ_TOPIC_ENABLE : PSMQ_TOPIC_DISABLE,
-			&err, sizeof(err), 0);
+	psmqd_broker_reply_ctrl(fd,
+			en ? PSMQ_CTRL_CMD_ENABLE: PSMQ_CTRL_CMD_DISABLE, 0);
 	el_oprint(OELN, "[%3d] client %s", fd, en ? "enabled" : "disabled");
 	return 0;
 }
@@ -587,12 +627,14 @@ static int psmqd_broker_enable
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     request:
-            topic       str     "-u/NNN" where NNN is file descriptor
-            payload     str     string with topic to unsubscribe
+            ctrl.cmd    char    PSMQ_CTRL_CMD_UNSUBSCRIBE
+            ctrl.data   uchar   file descriptor of the client
+            data        str     string with topic to unsubscribe
 
     response
-            topic       str     "-u"
-            payload     uchar   0 or errno value on failure
+            ctrl.cmd    char    PSMQ_CTRL_CMD_UNSUBSCRIBE
+            ctrl.data   uchar   0 on success, otherwise errno
+            data        -       none
 
     errno:
             UCHAR_MAX   returned errno from system is bigger than UCHAR_MAX
@@ -601,30 +643,28 @@ static int psmqd_broker_enable
 
 static int psmqd_broker_unsubscribe
 (
-	struct psmq_msg_pub  *msg  /* messages request */
+	struct psmq_msg  *msg     /* messages request */
 )
 {
-	unsigned char         fd;  /* client's file descriptor */
-	unsigned char         err; /* error to send to client as reply */
+	unsigned char     fd;     /* client's file descriptor */
+	unsigned char     err;    /* error to send to client as reply */
+	char             *utopic; /* topic to unsubscribe */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	fd = psmqd_broker_get_fd(msg);
-	if (fd == UCHAR_MAX)
-		return -1;
+	fd = msg->ctrl.data;
+	utopic = msg->data;
 
-	if (psmqd_tl_delete(&clients[fd].topics, (char *)msg->payload) != 0)
+	if (psmqd_tl_delete(&clients[fd].topics, utopic) != 0)
 	{
 		err = errno < UCHAR_MAX ? errno : UCHAR_MAX;
-		el_operror(OELW, "[%3d] unsubscribe failed, topic: %s", fd,
-				(char *)msg->payload);
-		psmqd_broker_reply(fd, PSMQ_TOPIC_UNSUBSCRIBE, &err, sizeof(err), 0);
+		el_operror(OELW, "[%3d] unsubscribe failed, topic: %s", fd, utopic);
+		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_UNSUBSCRIBE, err);
 		return -1;
 	}
 
-	err = 0;
-	el_oprint(OELN, "[%3d] unsubscribed %s", fd, (char *)msg->payload);
-	psmqd_broker_reply(fd, PSMQ_TOPIC_UNSUBSCRIBE, &err, sizeof(err), 0);
+	el_oprint(OELN, "[%3d] unsubscribed %s", fd, utopic);
+	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_UNSUBSCRIBE, 0);
 	return 0;
 }
 
@@ -634,35 +674,33 @@ static int psmqd_broker_unsubscribe
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     request:
-            topic       str     "-c/NNN" where NNN is file descriptor
-            payload     -       none
+            ctrl.cmd    char    PSMQ_CTRL_CMD_CLOSE
+            ctrl.data   uchar   file descriptor of the client
+            data        -       none
 
     response
-            topic       str     "-c"
-            payload     uchar   0 or errno value on failure
+            ctrl.cmd    char    PSMQ_CTRL_CMD_CLOSE
+            ctrl.data   uchar   0 on success, otherwise errno
+            data        -       none
    ========================================================================== */
 
 
 static int psmqd_broker_close
 (
-	struct psmq_msg_pub  *msg    /* messages request */
+	struct psmq_msg  *msg    /* messages request */
 )
 {
-	unsigned char         fd;    /* client's file descriptor */
-	unsigned char         err;   /* error to send to client as reply */
+	unsigned char     fd;    /* client's file descriptor */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	fd = psmqd_broker_get_fd(msg);
-	if (fd == UCHAR_MAX)
-		return -1;
+	fd = msg->ctrl.data;
 
 	/* send reply to broker we processed his close
 	 * request, yes we lie to him, but we won't be
-	 * able to ack him after we close
-	 * communication queue */
-	err = 0;
-	psmqd_broker_reply(fd, PSMQ_TOPIC_CLOSE, &err, sizeof(err), 0);
+	 * able to ack him after we close communication
+	 * queue */
+	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_CLOSE, 0);
 
 	/* first delete all topics client is subscribed to */
 	psmqd_tl_destroy(clients[fd].topics);
@@ -684,9 +722,12 @@ static int psmqd_broker_close
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     request:
-            topic       str     message topic
-            payload     any     published data
-            paylen      int     size of payload
+            ctrl.cmd    char    PSMQ_CTRL_CMD_PUBLISH
+            ctrl.data   uchar   file descriptor of requesting client
+            paylen      uint    size of data.payload
+            data
+                topic   str     topic to publish message on
+                payload any     data to publish
 
     response:
             none        -       psmq doesn't use any id to identify messages
@@ -699,23 +740,25 @@ static int psmqd_broker_close
 
 static int psmqd_broker_publish
 (
-	struct psmq_msg_pub  *msg,    /* published message by client */
-	unsigned int          prio    /* message priority */
+	struct psmq_msg  *msg,       /* published message by client */
+	unsigned int      prio       /* message priority */
 )
 {
-	unsigned char         fd;     /* client's file descriptor */
-	struct psmqd_tl       *node;  /* node with subscribed topic */
+	unsigned char     fd;        /* client's file descriptor */
+	struct psmqd_tl   *node;     /* node with subscribed topic */
+	void              *payload;  /* payload to publish */
+	char              *topic;    /* topic to publish message on */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	el_oprint(OELD, "received publish from topic %s, payload:", msg->topic);
-	el_opmemory(OELD, msg->payload, msg->paylen);
+	/* topic is verified for null termination
+	 * during data reception */
+	topic = msg->data;
+	payload = msg->data + strlen(topic) + 1;
 
-	VALIDOP(E2BIG, msg->paylen <= sizeof(msg->payload));
-	VALIDOP(ENOBUFS,
-			strlen(msg->topic) < size_of_member(struct psmq_msg, topic));
-	VALIDOP(ENOBUFS, msg->paylen <= size_of_member(struct psmq_msg, payload));
-
+	el_oprint(OELD, "received publish from topic %s, payload (len: %u):",
+			topic, msg->paylen);
+	el_opmemory(OELD, payload, msg->paylen);
 
 	/* iterate through all clients and send
 	 * message to whoever is subscribed and
@@ -737,20 +780,20 @@ static int psmqd_broker_publish
 		for (node = clients[fd].topics; node != NULL; node = node->next)
 		{
 			/* is client subscribed to current topic? */
-			if (psmqd_broker_topic_matches(msg->topic, node->topic) == 0)
+			if (psmqd_broker_topic_matches(topic, node->topic) == 0)
 				continue;  /* nope */
 
 			/* yes, we have a match, send message to the client */
-			if (psmqd_broker_reply(fd, msg->topic, msg->payload,
-						msg->paylen, prio) != 0)
+			if (psmqd_broker_reply(fd, PSMQ_CTRL_CMD_PUBLISH, 0,
+						topic, payload, msg->paylen, prio) != 0)
 			{
 				el_operror(OELE, "[%3d] sending failed. topic %s, prio %u,"
-						" payload:", fd, msg->topic, prio);
-				el_opmemory(OELE, msg->payload, msg->paylen);
+						" payload (len: %u):", fd, topic, prio, msg->paylen);
+				el_opmemory(OELE, payload, msg->paylen);
 				continue;
 			}
 
-			el_oprint(OELD, "publish %s to %d", msg->topic, fd);
+			el_oprint(OELD, "published %s to %d", topic, fd);
 
 			/* now it may be possible that another topic will match
 			 * for this client, for example when topic is /a/s/d
@@ -806,7 +849,7 @@ int psmqd_broker_init(void)
 	/* open message queue for control, we will
 	 * receive various (like register, publish or
 	 * subscribe) requests via it */
-	mqa.mq_msgsize = sizeof(struct psmq_msg_pub);
+	mqa.mq_msgsize = sizeof(struct psmq_msg);
 	mqa.mq_maxmsg = g_psmqd_cfg.broker_maxmsg;
 	qctrl = mq_open(g_psmqd_cfg.broker_name,
 			O_RDWR | O_CREAT | O_EXCL, 0600, &mqa);
@@ -837,9 +880,10 @@ int psmqd_broker_start(void)
 
 	for (;;)
 	{
-		struct timespec      tp;    /* timeout for mq_timedreceive() */
-		struct psmq_msg_pub  msg;   /* received message from client */
-		unsigned int         prio;  /* received message priority */
+		struct timespec  tp;        /* timeout for mq_timedreceive() */
+		struct psmq_msg  msg;       /* received message from client */
+		unsigned int     prio;      /* received message priority */
+		unsigned         topiclen;  /* length of topic in msg.data */
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -894,109 +938,61 @@ int psmqd_broker_start(void)
 		/* message, received, now what to do with
 		 * it? Well, at first let's try to validate it */
 
-		if (msg.paylen > sizeof(msg.payload))
+		/* all topics must be strings, so check if it
+		 * is nullified */
+		topiclen = strlen(msg.data);
+		if (topiclen >= sizeof(msg.data))
 		{
-			/* message is bigger then buffer
-			 * allows it, discard it */
-			el_oprint(OELW, "got paylen %d when max is %d",
-					msg.paylen, sizeof(msg.payload));
+			el_oprint(OELW, "incoming msg: topic is not null terminated "
+					"hexdump of msg is:");
+			el_opmemory(OELW, &msg, sizeof(msg));
 			continue;
 		}
 
-		/* all topics should be strings, so it is
-		 * safe to nullify last character of topic
-		 * array, we do this just in case when
-		 * someone sends not null terminated topic */
-		msg.topic[sizeof(msg.topic) - 1] = '\0';
-
-		if (msg.topic[0] == '-')
+		/* does message holds valid payload? */
+		if (topiclen + 1 + msg.paylen > sizeof(msg.data))
 		{
-			/* all topics that start from '-' character are
-			 * reserved for control messages, so let's pass message
-			 * to control functions */
-			el_oprint(OELD, "got control message '%c' payload '%s'",
-					msg.topic[1],
-					msg.paylen > 0 ? (const char *)msg.payload : "none");
-
-			switch (msg.topic[1])
-			{
-				case 'o': /* open request */
-					/* we expect string in payload, so it's safe to
-					 * null last byte in payload array */
-					msg.payload[sizeof(msg.payload) - 1] = '\0';
-					psmqd_broker_open((char *)msg.payload);
-					break;
-
-				case 'c': /* close request */
-					if (strlen(msg.topic) < 4 || msg.topic[2] != '/')
-					{
-						/* control msg is in format "-c/N" where N
-						 * is fd, so if topic is less than 4 bytes
-						 * there is no way there is valid fd there */
-						el_oprint(OELW, "invalid control topic %s", msg.topic);
-						continue;
-					}
-
-					psmqd_broker_close(&msg);
-					break;
-
-				case 's': /* subscribe requst */
-					if (strlen(msg.topic) < 4 || msg.topic[2] != '/')
-					{
-						el_oprint(OELW, "invalid control topic %s", msg.topic);
-						continue;
-					}
-
-					msg.payload[sizeof(msg.payload) - 1] = '\0';
-					psmqd_broker_subscribe(&msg);
-					break;
-
-				case 'u': /* unsibscribe request */
-					if (strlen(msg.topic) < 4 || msg.topic[2] != '/')
-					{
-						el_oprint(OELW, "invalid control topic %s", msg.topic);
-						continue;
-					}
-
-					msg.payload[sizeof(msg.payload) - 1] = '\0';
-					psmqd_broker_unsubscribe(&msg);
-					break;
-
-				case 'e': /* enable request */
-					if (strlen(msg.topic) < 4 || msg.topic[2] != '/')
-					{
-						el_oprint(OELW, "invalid control topic %s", msg.topic);
-						continue;
-					}
-
-					psmqd_broker_enable(&msg, 1);
-					break;
-
-				case 'd': /* disable request */
-					if (strlen(msg.topic) < 4 || msg.topic[2] != '/')
-					{
-						el_oprint(OELW, "invalid control topic %s", msg.topic);
-						continue;
-					}
-
-					psmqd_broker_enable(&msg, 0);
-					break;
-
-				default:
-					el_oprint(OELW, "received unknown request '%c'",
-							msg.topic[1]);
-			}
-
+			/* topic + length of payload claimed by the
+			 * client could not have fit into buffer. */
+			el_oprint(OELW, "incoming msg: invalid paylen, hexdump of msg is:");
+			el_opmemory(OELW, &msg, sizeof(msg));
 			continue;
 		}
 
-		/* any other message is treated as data to be broadcastead
-		 * to subscribed clients */
-		if (psmqd_broker_publish(&msg, prio) != 0)
+		if (msg.ctrl.cmd != PSMQ_CTRL_CMD_OPEN &&
+				msg.ctrl.data >= PSMQ_MAX_CLIENTS)
 		{
-			el_operror(OELE, "psmqd_broker_publish() failed, topic %s, "
-					"prio: %u, payload", msg.topic, prio);
-			el_opmemory(OELE, msg.payload, msg.paylen);
+			/* all messages are required to send valid
+			 * file descriptor, only open request does
+			 * not require it (since user requests fd
+			 * to be allocated for him to use).
+			 *
+			 * We cannot send back error to the client
+			 * since we do not have proper fd, so only
+			 * log the warning. */
+			el_oprint(OELW, "msg with invalid fd (%d) received, hexdump is:");
+			el_opmemory(OELW, &msg, sizeof(msg));
+			continue;
+		}
+
+		/* at this point we are sure that topic is properly
+		 * nullified and payload fits into buffer */
+
+		el_oprint(OELD, "got control message: %c", msg.ctrl.cmd);
+		el_opmemory(OELD, &msg, sizeof(msg));
+
+		switch (msg.ctrl.cmd)
+		{
+			case 'o': psmqd_broker_open(&msg); break;
+			case 'c': psmqd_broker_close(&msg); break;
+			case 's': psmqd_broker_subscribe(&msg); break;
+			case 'u': psmqd_broker_unsubscribe(&msg); break;
+			case 'e': psmqd_broker_enable(&msg, 1); break;
+			case 'd': psmqd_broker_enable(&msg, 0); break;
+			case 'p': psmqd_broker_publish(&msg, prio); break;
+			default:
+				el_oprint(OELW, "received unknown request '%c'",
+						msg.data[1]);
 		}
 	}
 }
@@ -1016,7 +1012,7 @@ int psmqd_broker_cleanup(void)
 	/* close all opened connections */
 	for (fd = 0; fd != PSMQ_MAX_CLIENTS; ++fd)
 	{
-		struct psmq_msg_pub  msg;
+		struct psmq_msg  msg;
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -1028,8 +1024,10 @@ int psmqd_broker_cleanup(void)
 		 * this will close connection and free all
 		 * resources, clients will be informed
 		 * about connection close. */
-		sprintf(msg.topic, PSMQ_TOPIC_CLOSE"/%d", fd);
 		msg.paylen = 0;
+		msg.ctrl.cmd = PSMQ_CTRL_CMD_CLOSE;
+		msg.ctrl.data = fd;
+		msg.data[0] = '\0';
 		psmqd_broker_close(&msg);
 	}
 

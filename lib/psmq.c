@@ -67,86 +67,46 @@
            >0       errno message from failed ack from broker
             0       broker send successfull ack
            -2       received something other than ack
-           -3       malformed data received from broker
    ========================================================================== */
 
 
 static int psmq_ack
 (
-	char         *topic,     /* topic of received ack */
-	void         *payload,   /* payload of ack response */
-	size_t        paylen,    /* length of payload buffer */
-	unsigned int  prio,      /* not used */
-	void         *userdata   /* not used */
+	char            *topic,     /* topic of received ack */
+	void            *payload,   /* payload of ack response */
+	size_t           paylen,    /* length of payload buffer */
+	unsigned int     prio,      /* not used */
+	void            *userdata   /* not used */
 )
 {
-	(void)userdata;
+	struct psmq_msg *msg;       /* message received from broker */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+	(void)topic;
+	(void)payload;
 	(void)prio;
 
-	/* ack messages are sent only when request
-	 * starting with '-' character */
-	if (topic[0] != '-')
+	msg = userdata;
+
+	/* all ack messages have empty msg->data[] part, that is
+	 * paylen must be 0, and first byte must be set to '\0',
+	 * otherwise we treat such message as regular publish.
+	 * Note that, regular publish can have paylen set to 0
+	 * (no data) but topic must always be set, so msg->data[]
+	 * will never be NULL for regular publish messages */
+	if (paylen != 0 || msg->data[0] != '\0')
 		return -2;
 
-	if (paylen != 1)
-	{
-		/* we expected to receive 1 byte int
-		 * here with ack, nothing else */
-		errno = EBADMSG;
-		return -3;
-	}
-
-	return *(unsigned char *)payload;
-}
-
-
-/* ==========================================================================
-    Processes ack reply from the broker from "-o" (open) message. That
-    reply, beside ack, contains also file descriptor used in further
-    communication with broker. When return value is 0, fd will be stored
-    in userdata location.
-
-    returns:
-           >0       errno message from failed ack from broker
-            0       broker send successfull ack
-           -2       received something other than open ack
-           -3       malformed data received from broker
-   ========================================================================== */
-
-
-static int psmq_open_ack
-(
-	char         *topic,     /* topic of received ack */
-	void         *payload,   /* payload of ack response */
-	size_t        paylen,    /* length of payload buffer */
-	unsigned int  prio,      /* not used */
-	void         *userdata   /* file descriptor to use when talking with broker */
-)
-{
-	(void)prio;
-
-	/* open response is suppose to send back message with
-	 * register topic, that is not the case here. There may be
-	 * some old data in queue. Return -2, so caller can decide
-	 * what to do with it.  */
-	if (strcmp(topic, PSMQ_TOPIC_OPEN) != 0)
-		return -2;
-
-	if (paylen != 2)
-	{
-		/* we expect to receive 2 chars here, one
-		 * for ack, and one with file descriptor */
-		errno = EBADMSG;
-		return -3;
-	}
-
-	*(unsigned char *)userdata = *((unsigned char *)payload + 1);
-	return *(unsigned char *)payload;
+	return msg->ctrl.data;
 }
 
 
 /* ==========================================================================
     This is same as psmq_receive() but does not check for psmq->enabled flag
+    Also, when full_msg is set to 1, pointer to msg is stored in userdata,
+    useless and not used for lib clients, but usefull and surely used for
+    internal ack reception. Note in that case user data will be overwritten!
    ========================================================================== */
 
 
@@ -154,7 +114,8 @@ static int psmq_receive_internal
 (
 	struct psmq     *psmq,     /* psmq object */
 	psmq_sub_clbk    clbk,     /* function to be called with received data */
-	void            *userdata  /* user data passed to clkb */
+	void            *userdata, /* user data passed to clkb */
+	int              full_msg  /* store msg in userdata */
 )
 {
 	struct psmq_msg  msg;      /* buffer to receive message */
@@ -170,7 +131,57 @@ static int psmq_receive_internal
 	if (mq_receive(psmq->qsub, (char *)&msg, sizeof(msg), &prio) == -1)
 		return -1;
 
-	return clbk(msg.topic, msg.payload, msg.paylen, prio, userdata);
+	if (full_msg)
+		userdata = &msg;
+
+	return clbk(msg.data, msg.data + strlen(msg.data) + 1,
+			msg.paylen, prio, userdata);
+}
+
+
+/* ==========================================================================
+    Same as psmq_publish, but also accepts psmq_msg.ctrl part of message, to
+    be able to send custom commands. Usefull only as internal usage.
+    Exported externally because tests use this function, but its usage won't
+    be documented and it is not guaranteed to have stable API/ABI.
+   ========================================================================== */
+
+
+int psmq_publish_msg
+(
+	struct psmq     *psmq,     /* psmq object */
+	char             cmd,      /* message command */
+	unsigned char    data,     /* data for the control part of message */
+	const char      *topic,    /* topic of message to be sent */
+	const void      *payload,  /* payload of message to be sent */
+	size_t           paylen,   /* length of payload buffer */
+	unsigned int     prio      /* message priority */
+)
+{
+	struct psmq_msg  pub;      /* buffer used to send out data to broker */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+	VALID(EINVAL, psmq);
+	VALID(EBADF, psmq->qpub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
+
+	pub.ctrl.cmd = cmd;
+	pub.ctrl.data = data;
+	pub.paylen = 0;
+	pub.data[0] = '\0';
+
+	if (topic)
+		strcpy(pub.data, topic);
+
+	/* payload may be NULL and it's ok, so set
+	 * payload only if it was set */
+	if (payload)
+	{
+		memcpy(pub.data + (topic ? strlen(topic) + 1 : 0), payload, paylen);
+		pub.paylen = paylen;
+	}
+
+	return mq_send(psmq->qpub, (char *)&pub, psmq_real_msg_size(pub), prio);
 }
 
 
@@ -190,7 +201,6 @@ static int psmq_un_subscribe
 	int           sub       /* subscribe - 1 or unsubsribe - 0 */
 )
 {
-	char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
 	int           ack;      /* response from the broker */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -200,12 +210,12 @@ static int psmq_un_subscribe
 	VALID(EINVAL, topic[0] != '\0');
 	VALID(EBADF, psmq->qsub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
-	VALID(ENOBUFS, strlen(topic) <= PSMQ_TOPIC_MAX);
+	VALID(ENOBUFS, strlen(topic) + 1 <= PSMQ_MSG_MAX);
 
 	/* send subscribe request to the server */
-	sprintf(topicfd, sub ? PSMQ_TOPIC_SUBSCRIBE"/%d" :
-			PSMQ_TOPIC_UNSUBSCRIBE"/%d", psmq->fd);
-	if (psmq_publish(psmq, topicfd, topic, strlen(topic) + 1, 0) != 0)
+	if (psmq_publish_msg(psmq,
+			sub ? PSMQ_CTRL_CMD_SUBSCRIBE : PSMQ_CTRL_CMD_UNSUBSCRIBE,
+			psmq->fd, topic, NULL, 0, 0) != 0)
 		return -1;
 
 	/* if psmq is enabled (that means it is primed to receive
@@ -217,7 +227,7 @@ static int psmq_un_subscribe
 		return 0;
 
 	/* now wait for ack reply */
-	ack = psmq_receive_internal(psmq, psmq_ack, NULL);
+	ack = psmq_receive_internal(psmq, psmq_ack, NULL, 1);
 
 	if (ack != 0)
 	{
@@ -242,7 +252,8 @@ static int psmq_un_subscribe
 
 /* ==========================================================================
     Publishes message on 'topic' with 'payload' of size 'paylen' with 'prio'
-    priority to broker defined in 'psmq'.
+    priority to broker defined in 'psmq'. This is used only to publish
+    real (non-control) messages.
 
     Returns 0 on success or -1 on errors
 
@@ -255,56 +266,24 @@ static int psmq_un_subscribe
 
 int psmq_publish
 (
-	struct psmq         *psmq,     /* psmq object */
-	const char          *topic,    /* topic of message to be sent */
-	const void          *payload,  /* payload of message to be sent */
-	size_t               paylen,   /* length of payload buffer */
-	unsigned int         prio      /* message priority */
+	struct psmq     *psmq,     /* psmq object */
+	const char      *topic,    /* topic of message to be sent */
+	const void      *payload,  /* payload of message to be sent */
+	size_t           paylen,   /* length of payload buffer */
+	unsigned int     prio      /* message priority */
 )
 {
-	struct psmq_msg_pub  pub;      /* buffer used to send out data to broker */
+	struct psmq_msg  pub;      /* buffer used to send out data to broker */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
 	VALID(EINVAL, psmq);
-	VALID(EBADF, psmq->qpub != (mqd_t)-1);
-	VALID(EBADF, psmq->qsub != psmq->qpub);
 	VALID(EINVAL, topic);
-	VALID(ENOBUFS, strlen(topic) < sizeof(pub.topic));
-	VALID(ENOBUFS, paylen <= sizeof(pub.payload));
-	VALID(EBADMSG, topic[0] == '/' || topic[0] == '-');
+	VALID(ENOBUFS, strlen(topic) + 1 + paylen <= sizeof(pub.data));
+	VALID(EBADMSG, topic[0] == '/');
 
-	if (topic[0] != '-')
-	{
-		/* when publishing message that is different than control
-		 * messages, we need to check if those messages will fit
-		 * message struct on clients. It is because struct for
-		 * publish messages may be bigger than struct for receiving
-		 * messages, and thus it is possible that message will
-		 * reach broker with no problem, but then broker won't be
-		 * able to propage it to the clients, because receive
-		 * struct is not big enough
-		 */
-
-		VALID(ENOBUFS, strlen(topic) < size_of_member(struct psmq_msg, topic));
-		VALID(ENOBUFS, paylen <= size_of_member(struct psmq_msg, payload));
-	}
-
-	memset(&pub, 0x00, sizeof(pub));
-	strcpy(pub.topic, topic);
-	pub.paylen = 0;
-
-	/* payload may be NULL and it's ok, so set
-	 * payload only if it was set
-	 */
-
-	if (payload)
-	{
-		memcpy(pub.payload, payload, paylen);
-		pub.paylen = paylen;
-	}
-
-	return mq_send(psmq->qpub, (const char *)&pub, sizeof(pub), prio);
+	return psmq_publish_msg(psmq, PSMQ_CTRL_CMD_PUBLISH, psmq->fd,
+			topic, payload, paylen, prio);
 }
 
 
@@ -335,7 +314,7 @@ int psmq_receive
 	VALID(EBADF, psmq->qpub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 	VALID(ENOTCONN, psmq->enabled);
-	return psmq_receive_internal(psmq, clbk, userdata);
+	return psmq_receive_internal(psmq, clbk, userdata, 0);
 }
 
 
@@ -381,7 +360,8 @@ int psmq_timedreceive
 	if (mq_timedreceive(psmq->qsub, (char *)&msg, sizeof(msg), &prio, tp) == -1)
 		return -1;
 
-	return clbk(msg.topic, msg.payload, msg.paylen, prio, userdata);
+	return clbk(msg.data, msg.data + strlen(msg.data) + 1,
+			msg.paylen, prio, userdata);
 }
 
 
@@ -468,8 +448,7 @@ int psmq_init
 	VALID(EINVAL, mqname[0] == '/');
 	VALID(EINVAL, maxmsg > 0);
 	mqnamelen = strlen(mqname);
-	VALID(ENAMETOOLONG,
-			mqnamelen < size_of_member(struct psmq_msg_pub, payload));
+	VALID(ENAMETOOLONG, mqnamelen < PSMQ_MSG_MAX);
 
 
 	memset(psmq, 0x00, sizeof(struct psmq));
@@ -490,7 +469,7 @@ int psmq_init
 		return -1;
 
 	/* open publish queue, this will be used to
-	 * subscribed to topics at the start, and
+	 * subscribe to topics at the start, and
 	 * later this will be used to publish data on
 	 * given topic */
 	psmq->qpub = mq_open(brokername, O_WRONLY);
@@ -505,29 +484,58 @@ int psmq_init
 	 * we have enough memory to operate, now we
 	 * need to register to broker, so it knows
 	 * where to send messages */
-	if (psmq_publish(psmq, PSMQ_TOPIC_OPEN, mqname, mqnamelen + 1, 0) != 0)
+	if (psmq_publish_msg(psmq, PSMQ_CTRL_CMD_OPEN, 0, mqname, NULL, 0, 0) != 0)
 		goto error;
 
 	/* check response from the broker on subscribe
 	 * queue to check if broker managed to
 	 * allocate memory for us and open queue on
 	 * his side. Read from broker until we read
-	 * something else than -2, which means we read
-	 * data other than register ack from the
-	 * broker. This may happen when we open queue
-	 * that already has some outstanding data -
-	 * like from previous crashed session, we can
-	 * safely discard those messages.
-	 */
+	 * open reply */
+	for (;;)
+	{
+		struct psmq_msg  msg;  /* received psmq message */
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-	while ((ack = psmq_receive_internal(psmq, psmq_open_ack, &psmq->fd)) == -2)
-	{};
+
+		if ((ack = mq_receive(psmq->qsub, (char *)&msg, sizeof(msg), 0)) == -1)
+			break;
+
+		/* open response is suppose to send back
+		 * message with open command, if that is
+		 * not the case, this could mean that
+		 * there may be some old data in queue.
+		 * This can happend if we open queue from
+		 * previously crashed session. Open
+		 * response is first message we ever
+		 * receive, so if there is anything else,
+		 * these messages do not belong to us and
+		 * we can safely discard them. */
+		if (msg.ctrl.cmd != PSMQ_CTRL_CMD_OPEN)
+			continue;
+
+		/* no space left for us on the broker */
+		ack = msg.ctrl.data;
+		if (msg.paylen == 0 && ack == ENOSPC)
+			break;
+
+		if (msg.paylen != 1)
+		{
+			/* we expected exactly 1 byte as fd,
+			 * anything else is wrong */
+			ack = EBADMSG;
+			break;
+		}
+
+		ack = msg.ctrl.data;
+		psmq->fd = msg.data[0];
+		break;
+	}
 
 	/* broker will return either 0 or errno to
 	 * indicate what went wrong on his side, if
 	 * ack is 0, broker will send file descriptor
 	 * to use when communicating with him. */
-
 	if (ack != 0)
 	{
 		if (ack > 0)
@@ -559,18 +567,13 @@ int psmq_cleanup
 	struct psmq  *psmq  /* psmq object to cleanup */
 )
 {
-	char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
 	VALID(EINVAL, psmq);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 
 	/* send close() to the broker, we don't care
 	 * if it succed or not, we close our booth and
 	 * nothing can stop us from doing it */
-	sprintf(topicfd, PSMQ_TOPIC_CLOSE"/%d", psmq->fd);
-	psmq_publish(psmq, topicfd, NULL, 0, 0);
+	psmq_publish_msg(psmq, PSMQ_CTRL_CMD_CLOSE, psmq->fd, NULL, NULL, 0, 0);
 	mq_close(psmq->qpub);
 	mq_close(psmq->qsub);
 	psmq->qpub = (mqd_t) -1;
@@ -632,7 +635,6 @@ int psmq_enable
 	int           enable  /* enable or disable client */
 )
 {
-	char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
 	int           ack;    /* response from the broker */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -642,15 +644,14 @@ int psmq_enable
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 	VALID(EINVAL, (enable & ~1) == 0);
 
-	/* send subscribe request to the server */
-	sprintf(topicfd, enable ? PSMQ_TOPIC_ENABLE"/%d" : PSMQ_TOPIC_DISABLE"/%d",
-			psmq->fd);
-
-	if (psmq_publish(psmq, topicfd, NULL, 0, 0) != 0)
+	/* send enable/disable request to the server */
+	if (psmq_publish_msg(psmq,
+				enable ? PSMQ_CTRL_CMD_ENABLE : PSMQ_CTRL_CMD_DISABLE,
+				psmq->fd, NULL, NULL, 0, 0) != 0)
 		return -1;
 
 	/* now wait for ack reply */
-	ack = psmq_receive_internal(psmq, psmq_ack, NULL);
+	ack = psmq_receive_internal(psmq, psmq_ack, NULL, 1);
 
 	if (ack != 0)
 	{
@@ -677,6 +678,9 @@ int psmq_enable
     and his receive function will receive disable ack and we simply exit
     after publish. It's up to user to later set psmq->enabled to 0, and
     provide proper synchronization.
+
+    Basically, it just sends disable request to the broker, but does not
+    wait for confirmation.
    ========================================================================== */
 
 
@@ -685,18 +689,13 @@ int psmq_disable_threaded
 	struct psmq  *psmq   /* psmq object */
 )
 {
-	char          topicfd[PSMQ_TOPIC_WITH_FD + 1]; /* topic with fd info */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
 	VALID(EINVAL, psmq);
 	VALID(EBADF, psmq->qsub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 
 	/* send disable request to the server */
-	sprintf(topicfd, PSMQ_TOPIC_DISABLE"/%d", psmq->fd);
-
-	if (psmq_publish(psmq, topicfd, NULL, 0, 0) != 0)
+	if (psmq_publish_msg(psmq, PSMQ_CTRL_CMD_DISABLE, psmq->fd,
+				NULL, NULL, 0, 0) != 0)
 		return -1;
 
 	/* threaded disable, caller is reponsible of

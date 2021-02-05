@@ -191,9 +191,8 @@ int psmq_sub_main
 					break;
 
 				case ENAMETOOLONG:
-					el_oprint(OELF, "queue name is too long (%lu), max is %lu",
-							strlen(qname),
-							size_of_member(struct psmq_msg_pub, payload) - 1);
+					el_oprint(OELF, "queue name is too long (%lu), max is %u",
+							strlen(qname), PSMQ_MSG_MAX - 1);
 					break;
 
 				case ENOENT:
