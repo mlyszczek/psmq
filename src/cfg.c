@@ -39,6 +39,7 @@
 #include "cfg.h"
 #include "globals.h"
 #include "psmq-common.h"
+#include "psmq.h"
 
 
 /* ==========================================================================

@@ -1,0 +1,124 @@
+/* ==========================================================================
+    Licensed under BSD 2clause license See LICENSE file for more information
+    Author: Michał Łyszczek <michal.lyszczek@bofc.pl>
+   ========================================================================== */
+
+#ifndef PSMQ_H
+#define PSMQ_H 1
+
+#include <mqueue.h>
+
+#define PSMQ_CTRL_CMD_OPEN        'o'
+#define PSMQ_CTRL_CMD_CLOSE       'c'
+#define PSMQ_CTRL_CMD_SUBSCRIBE   's'
+#define PSMQ_CTRL_CMD_UNSUBSCRIBE 'u'
+#define PSMQ_CTRL_CMD_ENABLE      'e'
+#define PSMQ_CTRL_CMD_DISABLE     'd'
+#define PSMQ_CTRL_CMD_PUBLISH     'p'
+
+
+/* This is called from psmq_receive() once message is received from
+ * broker. Params are:
+ *
+ *     psmq         pointer to psmq instance that received message
+ *     msg          full psmq_msg received from broker, contains
+ *                  all data, including control info
+ *     topic        topic of the message
+ *     payload      data of the message
+ *     paylen       length of payload
+ *     prio         priority of the message
+ *     userdata     custom userdata */
+struct psmq_msg;
+struct psmq;
+typedef int (*psmq_on_receive_clbk)(struct psmq *psmq,
+		struct psmq_msg *msg, char *topic, unsigned char *payload,
+		unsigned short paylen, unsigned prio, void *userdata);
+
+#ifndef PSMQ_MSG_MAX
+#define PSMQ_MSG_MAX (@PSMQ_MSG_MAX@)
+#endif
+
+/* struct used to hold state for single psmq client */
+struct psmq
+{
+	/* queue used to receive data from the broker,
+	 * it is used to receive both published message
+	 * user subscribed too, as well as control
+	 * messages */
+	mqd_t  qsub;
+
+	/* queue used to send messages to the broker,
+	 * it is used to publish both standard message
+	 * for other subscribed clients as well as
+	 * control messages like subscribe */
+	mqd_t  qpub;
+
+	/* unique file descriptor used when communicating
+	 * with broker, needed so that broker can id us */
+	unsigned char  fd;
+
+	/* callback called from psmq_receive() when message
+	 * is received */
+	psmq_on_receive_clbk  on_receive_clbk;
+
+	/* custom userdata passed to on_receive_clbk */
+	void  *userdata;
+};
+
+/* broker and clients both use this structure to communicate with
+ * each other. psmq will create single mqueue with size of this
+ * structure and one for each connected client, so it's worth keeping
+ * it as small as possible. */
+struct psmq_msg
+{
+	/* control messages are stored in this buffer */
+	struct ctrl
+	{
+		/* defines request command */
+		char  cmd;
+
+		/* during requst from the client, this holds file
+		 * descriptor of a client, an id to identify which client
+		 * is performing request
+		 *
+		 * during reply from the broker it hold request result
+		 * (0 for success or errno when error occured) */
+		unsigned char  data;
+	} ctrl;
+
+	/* length of payload data in msg, this contains only length of
+	 * data without topic. */
+	unsigned short  paylen;
+
+	/* data contains both topic and payload. Topic must always be
+	 * null-terminated after which payload follows. This allows
+	 * for some flexibility, ie if PSMQ_MSG_MAX was be 10, then
+	 * topic could be 3 bytes long and payload 7, but also
+	 * topic could take 9 bytes and payload only 1. */
+	char  data[PSMQ_MSG_MAX];
+};
+
+
+
+int psmq_init(struct psmq *psmq, const char *brokername, const char *mqname,
+		int maxmsg);
+int psmq_cleanup(struct psmq *psmq);
+int psmq_subscribe(struct psmq *psmq, const char *topic);
+int psmq_unsubscribe(struct psmq *psmq, const char *topic);
+int psmq_publish(struct psmq *psmq, const char *topic, const void *payload,
+		size_t paylen, unsigned int prio);
+
+int psmq_set_on_receive_clbk(struct psmq *psmq, psmq_on_receive_clbk clbk,
+		void *userdata);
+
+int psmq_receive(struct psmq *psmq);
+int psmq_timedreceive(struct psmq *psmq, struct timespec *tp);
+int psmq_timedreceive_ms(struct psmq *psmq, size_t ms);
+
+int psmq_receive_msg(struct psmq *psmq, struct psmq_msg *msg, unsigned *prio);
+int psmq_timedreceive_msg(struct psmq *psmq, struct psmq_msg *msg,
+		unsigned *prio, struct timespec *tp);
+int psmq_timedreceive_msg_ms(struct psmq *psmq, struct psmq_msg *msg,
+		unsigned *prio, size_t ms);
+
+#endif /* PSMQ_H */

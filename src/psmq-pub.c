@@ -94,14 +94,28 @@ static void send_message
 
 static void send_stdin
 (
-	struct psmq  *psmq,   /* psmq object */
-	const char   *topic,  /* topic of the message */
-	unsigned int  prio    /* message priority */
+	struct psmq  *psmq,      /* psmq object */
+	const char   *topic,     /* topic of the message */
+	unsigned int  prio       /* message priority */
 )
 {
+	unsigned int  topiclen;  /* length of topic string */
+	unsigned int  linemax;   /* max allowed length of line buf */
 	char          line[PSMQ_MSG_MAX];  /* single line read from stdin */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+
+	topiclen = strlen(topic);
+	if (topiclen >= sizeof(line))
+	{
+		fprintf(stderr, "f/topic is too long, max is %lu\n",
+				(unsigned long)sizeof(line) - 1);
+		return;
+	}
+	/* internal psmq buffer of size PSMQ_MSG_MAX
+	 * shares space between topic and data, so
+	 * line + topic cannot exceed that size */
+	linemax = sizeof(line) - (topiclen + 1);
 
 	/* message was not set, so we take a little
 	 * longer path, read stdin until EOF is
@@ -112,8 +126,8 @@ static void send_stdin
 		/* set last byte of line buffer to
 		 * something other than '\0' to know
 		 * whether fgets overwrite it or not */
-		line[sizeof(line) - 1] = 0x55;
-		if (fgets(line, sizeof(line), stdin) == NULL)
+		line[linemax - 1] = 0x55;
+		if (fgets(line, linemax, stdin) == NULL)
 		{
 			/* if end of file is reached and no
 			 * data has been read, we're done */
@@ -124,7 +138,7 @@ static void send_stdin
 			return;
 		}
 
-		if (line[sizeof(line) - 1] == '\0' && line[sizeof(line) - 2] != '\n')
+		if (line[linemax - 1] == '\0' && line[linemax - 2] != '\n')
 		{
 			/* fgets did overwrite last byte with
 			 * '\0' which means it filled whole
@@ -138,8 +152,7 @@ static void send_stdin
 			 * that is too long to fit into one
 			 * message, abort with error
 			 */
-			fprintf(stderr, "f/line is too long, max line is %lu\n",
-					(long unsigned)sizeof(line) - 2);
+			fprintf(stderr, "f/line is too long, max line is %u\n", linemax - 2);
 			return;
 		}
 
@@ -157,10 +170,6 @@ static void send_stdin
 			case EBADMSG:
 				fprintf(stderr, "f/failed to publish to %s invalid topic\n",
 						topic);
-				break;
-
-			case ENOBUFS:
-				fprintf(stderr, "f/topic is too long\n");
 				break;
 			}
 
@@ -289,7 +298,7 @@ int psmq_pub_main
 
 		case ENAMETOOLONG:
 			fprintf(stderr, "f/queue name is too long (%lu), max is %u\n",
-					(unsigned long)strlen(qname), PSMQ_MSG_MAX);
+					(unsigned long)strlen(qname), PSMQ_MSG_MAX - 1);
 			break;
 		}
 

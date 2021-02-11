@@ -85,35 +85,53 @@ static void sigint_handler
 
 #endif
 
+
 /* ==========================================================================
-    Callback called by psmq_receive with received data
+    Callback called by psmq_receive() with received data
    ========================================================================== */
 
 
 static int on_receive
 (
-	char         *topic,    /* topic of received message */
-	void         *payload,  /* message payload */
-	size_t        paylen,   /* length of payload data */
-	unsigned int  prio,     /* message priority */
-	void         *userdata  /* not used */
+	struct psmq      *psmq,     /* psmq client that received msg */
+	struct psmq_msg  *msg,      /* full received message */
+	char             *topic,    /* topic of received message */
+	unsigned char    *payload,  /* message payload */
+	unsigned short    paylen,   /* length of payload data */
+	unsigned int      prio,     /* message priority */
+	void             *userdata  /* not used */
 )
 {
 	(void)userdata;
+	(void)psmq;
 
-	if (strcmp(topic, "-c") == 0)
+	switch (msg->ctrl.cmd)
 	{
-		el_oprint(OELN, "broker has closed the connection");
-		return -1;
+		case PSMQ_CTRL_CMD_SUBSCRIBE:
+			errno = msg->ctrl.data;
+			if (msg->ctrl.data == 0)
+				el_oprint(OELN, "subscribed to %s", topic);
+			else
+				el_oprint(OELN, "subscribe error: %s", strerror(errno));
+			return msg->ctrl.data;
+
+		case PSMQ_CTRL_CMD_CLOSE:
+			el_oprint(OELN, "broker has closed the connection");
+			errno = msg->ctrl.data;
+			return -1;
+
+		case PSMQ_CTRL_CMD_PUBLISH:
+			el_oprint(ELN, &psmqs_out, "topic: %s, priority: %u, paylen: %lu%s",
+					topic, prio, paylen, paylen ? ", payload:" : "");
+			if (paylen)
+				el_opmemory(ELN, &psmqs_out, payload, paylen);
+			return 0;
+
+		default:
+			el_oprint(ELE, &psmqs_out, "Unknown cmd received: %c(%02x)",
+					msg->ctrl.cmd, msg->ctrl.cmd);
+			return -1;
 	}
-
-	el_oprint(ELN, &psmqs_out, "topic: %s, priority: %u, paylen: %lu%s",
-			topic, prio, paylen, paylen ? ", payload:" : "");
-
-	if (paylen)
-		el_opmemory(ELN, &psmqs_out, payload, paylen);
-
-	return 0;
 }
 
 
@@ -140,6 +158,8 @@ int psmq_sub_main
 	int               arg;     /* arg for getopt() */
 	struct psmq       psmq;    /* psmq object */
 	const char       *qname;   /* name of the client queue */
+	int               got_b;   /* -b option was passed */
+	int               got_t;   /* -t option was passed */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -166,6 +186,8 @@ int psmq_sub_main
 	el_ooption(&psmqs_out, EL_TS_TM, EL_TS_TM_REALTIME);
 	el_ooption(&psmqs_out, EL_PRINT_LEVEL, 0);
 
+	got_b = 0;
+	got_t = 0;
 	run = 1;
 	qname = "/psmq-sub";
 	memset(&psmq, 0x00, sizeof(psmq));
@@ -173,6 +195,10 @@ int psmq_sub_main
 
 	while ((arg = getopt(argc, argv, ":hvt:b:n:o:")) != -1)
 	{
+		struct psmq_msg  msg;  /* control message recieved from boker */
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
 		switch (arg)
 		{
 		case 'n': qname = optarg; break;
@@ -180,6 +206,7 @@ int psmq_sub_main
 		case 'b':
 			/* broker name passed, open connection to the broker,
 			 * if qname was not set, use default /psmq-sub queue */
+			got_b = 1;
 			el_oprint(OELN, "init: broker name: %s, queue name: %s",
 					optarg, qname);
 			if (psmq_init(&psmq, optarg, qname, 10) != 0)
@@ -204,10 +231,12 @@ int psmq_sub_main
 				return 1;
 			}
 			el_oprint(OELN, "connected to broker %s", optarg);
+			psmq_set_on_receive_clbk(&psmq, on_receive, NULL);
 			break;
 
 		case 't':
 			/* topic passed, subscribe to the broker */
+			got_t = 1;
 			if (psmq_subscribe(&psmq, optarg) != 0)
 			{
 				switch (errno)
@@ -228,11 +257,34 @@ int psmq_sub_main
 					break;
 				}
 
-				el_operror(OELF, "subscri: unknown");
+				el_operror(OELF, "subscribe: unknown");
 				psmq_cleanup(&psmq);
 				return 1;
 			}
-			el_oprint(OELN, "subscribed to %s", optarg);
+
+			if (psmq_receive_msg(&psmq, &msg, NULL) != 0)
+			{
+				el_operror(OELF, "error reading from queue");
+				psmq_cleanup(&psmq);
+				return 1;
+			}
+
+			if (msg.ctrl.cmd != PSMQ_CTRL_CMD_SUBSCRIBE)
+			{
+				el_oprint(OELF, "invalid reply from broker, cmd: %02x",
+						msg.ctrl.cmd);
+				psmq_cleanup(&psmq);
+				return 1;
+			}
+
+			if (msg.ctrl.data == EBADMSG)
+			{
+				el_oprint(OELF, "subscribe failed, topic %s is invalid",
+						msg.data);
+				psmq_cleanup(&psmq);
+				return 1;
+			}
+
 			break;
 
 		case 'o':
@@ -281,10 +333,19 @@ int psmq_sub_main
 		}
 	}
 
-	if (psmq_enable(&psmq, 1) != 0)
+	if (got_b == 0)
 	{
-		el_oprint(OELF, "failed to enable client, missing -b options");
+		/* no -b means no psmq_init() has been called,
+		 * we can bail without cleaning */
+		el_oprint(OELF, "missing -b option");
+		return 1;
+	}
+
+	if (got_t == 0)
+	{
+		el_oprint(OELF, "missing -t option");
 		psmq_cleanup(&psmq);
+		mq_unlink(qname);
 		return 1;
 	}
 
@@ -292,7 +353,7 @@ int psmq_sub_main
 
 	while (run)
 	{
-		if (psmq_receive(&psmq, on_receive, NULL) != 0)
+		if (psmq_receive(&psmq) != 0)
 		{
 			if (errno == EINTR)
 			{

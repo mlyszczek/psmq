@@ -68,45 +68,4 @@
 #define psmq_real_msg_size(m) (sizeof((m).paylen) + sizeof((m).ctrl) + \
 		strlen((m).data) + 1 + (m).paylen)
 
-#define PSMQ_CTRL_CMD_OPEN        'o'
-#define PSMQ_CTRL_CMD_CLOSE       'c'
-#define PSMQ_CTRL_CMD_SUBSCRIBE   's'
-#define PSMQ_CTRL_CMD_UNSUBSCRIBE 'u'
-#define PSMQ_CTRL_CMD_ENABLE      'e'
-#define PSMQ_CTRL_CMD_DISABLE     'd'
-#define PSMQ_CTRL_CMD_PUBLISH     'p'
-
-/* broker and clients both use this structure to communicate with
- * each other. psmq will create single mqueue with size of this
- * structure and one for each connected client, so it's worth keeping
- * it as small as possible. */
-struct psmq_msg
-{
-	/* control messages are stored in this buffer */
-	struct ctrl
-	{
-		/* defines request command */
-		char  cmd;
-
-		/* during requst from the client, this holds file
-		 * descriptor of a client, an id to identify which client
-		 * is performing request
-		 *
-		 * during reply from the broker it hold request result
-		 * (0 for success or errno when error occured) */
-		unsigned char  data;
-	} ctrl;
-
-	/* length of payload data in msg, this contains only length of
-	 * data without topic. */
-	unsigned short  paylen;
-
-	/* data contains both topic and payload. Topic must always be
-	 * null-terminated after which payload follows. This allows
-	 * for some flexibility, ie if PSMQ_MSG_MAX was be 10, then
-	 * topic could be 3 bytes long and payload 7, but also
-	 * topic could take 9 bytes and payload only 1. */
-	char  data[PSMQ_MSG_MAX];
-};
-
 #endif /* PSMQ_BROKER_H */

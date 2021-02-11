@@ -28,7 +28,7 @@ CC="$PTHREAD_CC"
 
 AC_SEARCH_LIBS([el_init], [embedlog])
 AC_SEARCH_LIBS([mq_open], [rt])
-
+AC_CONFIG_FILES(inc/psmq.h)
 # POSIX mandates signals to be implemented *always*, but still there are
 # some super tiny unixes that decided not to implement them. Also, embedded,
 # remember? This is mainly for embedded which may not implement POSIX at all.
@@ -124,7 +124,7 @@ AS_IF([test $PSMQ_MAX_CLIENTS -lt 2],
 
 AC_ARG_VAR([PSMQ_MSG_MAX], [Maximum length of message (topic + payload)])
 AS_IF([test "x$PSMQ_MSG_MAX" = x], [PSMQ_MSG_MAX="255"])
-AC_DEFINE_UNQUOTED([PSMQ_MSG_MAX], [$PSMQ_MSG_MAX], [Maximum length of message (topic + payload])
+#AC_DEFINE_UNQUOTED([PSMQ_MSG_MAX], [$PSMQ_MSG_MAX], [Maximum length of message (topic + payload])
 
 AS_IF([test $PSMQ_MSG_MAX -lt 9],
 [

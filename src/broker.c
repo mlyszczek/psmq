@@ -5,8 +5,8 @@
          -------------------------------------------------------------
         / Broker modules is reponsible for processing events from the \
         | clients. This is where clients are initialized. subscribed. |
-        | enabled and all published messages are propagaded to        |
-        \ subscribed clients                                          /
+        | and all published messages are propagaded to subscribed     |
+        \ clients                                                     /
          -------------------------------------------------------------
              \                 / \  //\
               \ |\___/|      /   \//  \\
@@ -55,6 +55,7 @@
 #include "psmq-common.h"
 #include "topic-list.h"
 #include "valid.h"
+#include "psmq.h"
 
 
 /* ==========================================================================
@@ -77,12 +78,6 @@ struct client
 	/* list of topics client is subscribed to, if NULL, client is
 	 * not subscribed to any topic */
 	struct psmqd_tl  *topics;
-
-	/* Defines whether client is enabled or not. When set to 0,
-	 * client won't receive any published messages (it will still
-	 * receive control messages though) even if he is subscribed
-	 * to published topic.  */
-	int  enabled;
 };
 
 
@@ -328,74 +323,11 @@ static int psmqd_broker_reply_ctrl
 (
 	int           fd,       /* fd of client to send message to */
 	char          cmd,      /* command to which reply applies */
-	unsigned char data      /* errno reply */
+	unsigned char data,     /* errno reply */
+	const char   *extra     /* extra string data to send back to client */
 )
 {
-	return psmqd_broker_reply(fd, cmd, data, NULL, NULL, 0, 0);
-}
-
-/* ==========================================================================
-    Extracts file decriptor information from msg
-
-    Returns valid fd or UCHAR_MAX on errors.
-   ========================================================================== */
-
-
-static unsigned char psmqd_broker_get_fd
-(
-	struct psmq_msg  *msg      /* message to read fd from */
-)
-{
-	long              fd;      /* fd converted from string */
-	char             *fdstr;   /* received fd as string */
-	char             *endptr;  /* error indicator for strol */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	/* all control frames must have topic in form
-	 * "-X/NNN", where X is command character, and
-	 * NNN is clients file descriptor. First byte
-	 * of data is start of topic */
-	fdstr = msg->data + 3;
-
-	/* convert string file descriptor into int */
-	fd = strtol(fdstr, &endptr, 10);
-
-	if (*endptr != '\0')
-	{
-		/* there was an unexpected character in fdstr */
-		el_oprint(OELW, "received wrong file descriptor %s", fdstr);
-		return UCHAR_MAX;
-	}
-
-	if (fd < 0 || fd >= PSMQ_MAX_CLIENTS)
-	{
-		/* file descriptor out of range */
-		el_oprint(OELW, "received out of range file descriptor %s", fdstr);
-		return UCHAR_MAX;
-	}
-
-	return (unsigned char)fd;
-}
-
-
-/* ==========================================================================
-    Returns pointer to start of payload in msg->data buffer. If there is no
-    payload NULL is returned. Function does not perform any validation.
-   ========================================================================== */
-
-
-static void * psmqd_broker_get_payload
-(
-	struct psmq_msg  *msg  /* received message */
-)
-{
-	/* obviously there is no payload
-	 * when paylen is 0 */
-	if (msg->paylen == 0)
-		return NULL;
-
-	return msg->data + strlen(msg->data) + 1;
+	return psmqd_broker_reply(fd, cmd, data, extra, NULL, 0, 0);
 }
 
 
@@ -499,7 +431,7 @@ static int psmqd_broker_open
     response
             ctrl.cmd    char    PSMQ_CTRL_CMD_SUBSCRIBE
             ctrl.data   uchar   0 on success, otherwise errno
-            data        -       none
+            data        -       topic used tried to subscribe to
 
     errno for response:
             EBADMSG     payload is not a string or not a valid topic
@@ -565,7 +497,7 @@ static int psmqd_broker_subscribe
 
 	if (err)
 	{
-		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, err);
+		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, err, stopic);
 		return -1;
 	}
 
@@ -575,49 +507,13 @@ static int psmqd_broker_subscribe
 		/* subscription failed */
 		err = errno < UCHAR_MAX ? errno : UCHAR_MAX;
 		el_operror(OELW, "[%3d] failed to add topic to list", fd);
-		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, err);
+		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, err, stopic);
 		return -1;
 	}
 
 	err = 0;
-	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, 0);
+	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, 0, stopic);
 	el_oprint(OELN, "[%3d] subscribed to %s", fd, stopic);
-	return 0;
-}
-
-
-/* ==========================================================================
-    Enables or disables client to receive messages. After that message, all
-    messages matching client's subscribed topics will be sent to him or not
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    request:
-            ctrl.cmd    char    PSMQ_CTRL_CMD_ENABLE or PSMQ_CTRL_CMD_DISABLE
-            ctrl.data   uchar   file descriptor of the client
-            data        -       none
-
-    response
-            ctrl.cmd    char    PSMQ_CTRL_CMD_ENABLE or PSMQ_CTRL_CMD_DISABLE
-            ctrl.data   uchar   0 on success, otherwise errno
-            data        -       none
-   ========================================================================== */
-
-
-static int psmqd_broker_enable
-(
-	struct psmq_msg  *msg, /* messages request */
-	int               en   /* enable or disable */
-)
-{
-	unsigned char     fd;  /* client's file descriptor */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	fd = msg->ctrl.data;
-	clients[fd].enabled = en;
-	psmqd_broker_reply_ctrl(fd,
-			en ? PSMQ_CTRL_CMD_ENABLE: PSMQ_CTRL_CMD_DISABLE, 0);
-	el_oprint(OELN, "[%3d] client %s", fd, en ? "enabled" : "disabled");
 	return 0;
 }
 
@@ -659,12 +555,12 @@ static int psmqd_broker_unsubscribe
 	{
 		err = errno < UCHAR_MAX ? errno : UCHAR_MAX;
 		el_operror(OELW, "[%3d] unsubscribe failed, topic: %s", fd, utopic);
-		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_UNSUBSCRIBE, err);
+		psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_UNSUBSCRIBE, err, utopic);
 		return -1;
 	}
 
 	el_oprint(OELN, "[%3d] unsubscribed %s", fd, utopic);
-	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_UNSUBSCRIBE, 0);
+	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_UNSUBSCRIBE, 0, utopic);
 	return 0;
 }
 
@@ -700,7 +596,7 @@ static int psmqd_broker_close
 	 * request, yes we lie to him, but we won't be
 	 * able to ack him after we close communication
 	 * queue */
-	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_CLOSE, 0);
+	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_CLOSE, 0, NULL);
 
 	/* first delete all topics client is subscribed to */
 	psmqd_tl_destroy(clients[fd].topics);
@@ -761,17 +657,11 @@ static int psmqd_broker_publish
 	el_opmemory(OELD, payload, msg->paylen);
 
 	/* iterate through all clients and send
-	 * message to whoever is subscribed and
-	 * enabled */
+	 * message to whoever is subscribed */
 	for (fd = 0; fd != PSMQ_MAX_CLIENTS; ++fd)
 	{
 		/* do we have client in this slot? */
 		if (clients[fd].mq == (mqd_t)-1)
-			continue;  /* nope */
-
-		/* does client want to receive any
-		 * published messages? */
-		if (clients[fd].enabled == 0)
 			continue;  /* nope */
 
 		/* iterate through list of topics for that
@@ -987,8 +877,6 @@ int psmqd_broker_start(void)
 			case 'c': psmqd_broker_close(&msg); break;
 			case 's': psmqd_broker_subscribe(&msg); break;
 			case 'u': psmqd_broker_unsubscribe(&msg); break;
-			case 'e': psmqd_broker_enable(&msg, 1); break;
-			case 'd': psmqd_broker_enable(&msg, 0); break;
 			case 'p': psmqd_broker_publish(&msg, prio); break;
 			default:
 				el_oprint(OELW, "received unknown request '%c'",
