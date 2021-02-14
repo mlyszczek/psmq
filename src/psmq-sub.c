@@ -87,24 +87,19 @@ static void sigint_handler
 
 
 /* ==========================================================================
-    Callback called by psmq_receive() with received data
+    Called by us when we receive message from broker.
    ========================================================================== */
 
 
 static int on_receive
 (
-	struct psmq      *psmq,     /* psmq client that received msg */
 	struct psmq_msg  *msg,      /* full received message */
 	char             *topic,    /* topic of received message */
 	unsigned char    *payload,  /* message payload */
 	unsigned short    paylen,   /* length of payload data */
-	unsigned int      prio,     /* message priority */
-	void             *userdata  /* not used */
+	unsigned int      prio      /* message priority */
 )
 {
-	(void)userdata;
-	(void)psmq;
-
 	switch (msg->ctrl.cmd)
 	{
 		case PSMQ_CTRL_CMD_SUBSCRIBE:
@@ -195,7 +190,7 @@ int psmq_sub_main
 
 	while ((arg = getopt(argc, argv, ":hvt:b:n:o:")) != -1)
 	{
-		struct psmq_msg  msg;  /* control message recieved from boker */
+		struct psmq_msg  msg;  /* control message recieved from broker */
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -231,7 +226,6 @@ int psmq_sub_main
 				return 1;
 			}
 			el_oprint(OELN, "connected to broker %s", optarg);
-			psmq_set_on_receive_clbk(&psmq, on_receive, NULL);
 			break;
 
 		case 't':
@@ -262,7 +256,7 @@ int psmq_sub_main
 				return 1;
 			}
 
-			if (psmq_receive_msg(&psmq, &msg, NULL) != 0)
+			if (psmq_receive(&psmq, &msg, NULL) != 0)
 			{
 				el_operror(OELF, "error reading from queue");
 				psmq_cleanup(&psmq);
@@ -353,7 +347,12 @@ int psmq_sub_main
 
 	while (run)
 	{
-		if (psmq_receive(&psmq) != 0)
+		struct psmq_msg  msg;  /* buffer to receive message from boker */
+		unsigned int     prio; /* received message priority */
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+		if (psmq_receive(&psmq, &msg, &prio) != 0)
 		{
 			if (errno == EINTR)
 			{
@@ -364,6 +363,10 @@ int psmq_sub_main
 			el_operror(OELF, "psmq_receive() failed");
 			break;
 		}
+
+		if (on_receive(&msg, PSMQ_TOPIC(msg), PSMQ_PAYLOAD(msg),
+					msg.paylen, prio) == -1)
+			break;
 	}
 
 	psmq_cleanup(&psmq);

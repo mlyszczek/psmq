@@ -17,26 +17,12 @@
 #define PSMQ_CTRL_CMD_PUBLISH     'p'
 
 
-/* This is called from psmq_receive() once message is received from
- * broker. Params are:
- *
- *     psmq         pointer to psmq instance that received message
- *     msg          full psmq_msg received from broker, contains
- *                  all data, including control info
- *     topic        topic of the message
- *     payload      data of the message
- *     paylen       length of payload
- *     prio         priority of the message
- *     userdata     custom userdata */
-struct psmq_msg;
-struct psmq;
-typedef int (*psmq_on_receive_clbk)(struct psmq *psmq,
-		struct psmq_msg *msg, char *topic, unsigned char *payload,
-		unsigned short paylen, unsigned prio, void *userdata);
-
 #ifndef PSMQ_MSG_MAX
 #define PSMQ_MSG_MAX (@PSMQ_MSG_MAX@)
 #endif
+
+#define PSMQ_TOPIC(p) ((p).data)
+#define PSMQ_PAYLOAD(p) ((void *)((p).data + strlen((p).data) + 1))
 
 /* struct used to hold state for single psmq client */
 struct psmq
@@ -56,13 +42,6 @@ struct psmq
 	/* unique file descriptor used when communicating
 	 * with broker, needed so that broker can id us */
 	unsigned char  fd;
-
-	/* callback called from psmq_receive() when message
-	 * is received */
-	psmq_on_receive_clbk  on_receive_clbk;
-
-	/* custom userdata passed to on_receive_clbk */
-	void  *userdata;
 };
 
 /* broker and clients both use this structure to communicate with
@@ -108,17 +87,10 @@ int psmq_unsubscribe(struct psmq *psmq, const char *topic);
 int psmq_publish(struct psmq *psmq, const char *topic, const void *payload,
 		size_t paylen, unsigned int prio);
 
-int psmq_set_on_receive_clbk(struct psmq *psmq, psmq_on_receive_clbk clbk,
-		void *userdata);
-
-int psmq_receive(struct psmq *psmq);
-int psmq_timedreceive(struct psmq *psmq, struct timespec *tp);
-int psmq_timedreceive_ms(struct psmq *psmq, size_t ms);
-
-int psmq_receive_msg(struct psmq *psmq, struct psmq_msg *msg, unsigned *prio);
-int psmq_timedreceive_msg(struct psmq *psmq, struct psmq_msg *msg,
+int psmq_receive(struct psmq *psmq, struct psmq_msg *msg, unsigned *prio);
+int psmq_timedreceive(struct psmq *psmq, struct psmq_msg *msg,
 		unsigned *prio, struct timespec *tp);
-int psmq_timedreceive_msg_ms(struct psmq *psmq, struct psmq_msg *msg,
+int psmq_timedreceive_ms(struct psmq *psmq, struct psmq_msg *msg,
 		unsigned *prio, size_t ms);
 
 #endif /* PSMQ_H */

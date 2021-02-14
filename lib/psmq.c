@@ -197,130 +197,6 @@ int psmq_publish
 
 
 /* ==========================================================================
-    Waits for data to be sent from broker 'psmq' and calls user's callback
-    with optional userdata when data is received. Function will block until
-    message is received or until signal is received.
-
-    When error ocurs, function returns -1, when message has been read from
-    queue with success, user's on_receive_clbk() function is called and
-    return value from that function is returned.
-
-    errno:
-            EINVAL      psmq is invalid (null)
-            EINVAL      on_receive_clbk has no been set
-            EBADF       psmq was not properly initialized
-            EINTR       The call was interrupted by a signal handler
-            EAGAIN      The queue was empty, and the O_NONBLOCK flag was set
-                        for the message queue
-   ========================================================================== */
-
-
-int psmq_receive
-(
-	struct psmq     *psmq      /* psmq object */
-)
-{
-	struct psmq_msg  msg;      /* buffer to receive message */
-	unsigned int     prio;     /* message priority */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	VALID(EINVAL, psmq);
-	VALID(EBADF, psmq->qpub != (mqd_t)-1);
-	VALID(EBADF, psmq->qsub != psmq->qpub);
-	VALID(EINVAL, psmq->on_receive_clbk);
-
-
-	if (mq_receive(psmq->qsub, (char *)&msg, sizeof(msg), &prio) == -1)
-		return -1;
-
-	return psmq->on_receive_clbk(psmq, &msg, msg.data,
-			(unsigned char *)msg.data + strlen(msg.data) + 1,
-			msg.paylen, prio, psmq->userdata);
-}
-
-
-/* ==========================================================================
-    Same as psmq_receive(), but block only for ammount of time specified by
-    absolute timespec 'tp', unlike psmq_receive() which will block until
-    message is received (or is interrupted by signal).
-
-    When timeout occurs, on_receive_clbk() is not called.
-    When seconds is 0, function returns immediately.
-
-    errno:
-            EINVAL      psmq is invalid (null)
-            EINVAL      clbk is invalid (null)
-            EBADF       psmq was not properly initialized
-            ENOTCONN    psmq object is not enabled and cannot receive msgs
-            ETIMEDOUT   timeout occured and message did not arrive
-
-    notes:
-            On qnx (up until 6.4.0 at least) when timeout occurs,
-            mq_timedreceveice will return EINTR instead of ETIMEDOUT
-   ========================================================================== */
-
-
-int psmq_timedreceive
-(
-	struct psmq     *psmq,  /* psmq object */
-	struct timespec *tp     /* absolute point in time when timeout occurs */
-)
-{
-	struct psmq_msg  msg;   /* buffer to receive message */
-	unsigned int     prio;  /* received message priority */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	VALID(EINVAL, psmq);
-	VALID(EINVAL, tp);
-	VALID(EBADF, psmq->qsub != (mqd_t)-1);
-	VALID(EBADF, psmq->qsub != psmq->qpub);
-	VALID(EINVAL, psmq->on_receive_clbk);
-
-	if (mq_timedreceive(psmq->qsub, (char *)&msg, sizeof(msg), &prio, tp) == -1)
-		return -1;
-
-	return psmq->on_receive_clbk(psmq, &msg, msg.data,
-			(unsigned char *)msg.data + strlen(msg.data) + 1,
-			msg.paylen, prio, psmq->userdata);
-}
-
-
-/* ==========================================================================
-    Same as psmq_timedreceive() but accepts 'milisecond' time that shall
-    pass before timeout should occur instead of absolute timespec.
-
-    When timeout occurs, on_receive_callback() is not called.
-    When seconds is 0, function returns immediately.
-
-    errno:
-            EINVAL      psmq is invalid (null)
-            EINVAL      clbk is invalid (null)
-            EBADF       psmq was not properly initialized
-            ENOTCONN    psmq object is not enabled and cannot receive msgs
-            ETIMEDOUT   timeout occured and message did not arrive
-
-    notes:
-            On qnx (up until 6.4.0 at least) when timeout occurs,
-            mq_timedreceveice will return EINTR instead of ETIMEDOUT
-   ========================================================================== */
-
-
-int psmq_timedreceive_ms
-(
-	struct psmq     *psmq,  /* psmq object */
-	size_t           ms     /* ms to wait until timeout occurs */
-)
-{
-	struct timespec  tp;    /* absolute time to wait for timeout */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	psmq_ms_to_tp(ms, &tp);
-	return psmq_timedreceive(psmq, &tp);
-}
-
-
-/* ==========================================================================
     Receives message from the broker and stores it in user provided buffer
     'msg'. Does not call any callbacks.
 
@@ -333,7 +209,7 @@ int psmq_timedreceive_ms
    ========================================================================== */
 
 
-int psmq_receive_msg
+int psmq_receive
 (
 	struct psmq      *psmq,  /* psmq object */
 	struct psmq_msg  *msg,   /* received message */
@@ -341,6 +217,7 @@ int psmq_receive_msg
 )
 {
 	VALID(EINVAL, psmq);
+	VALID(EINVAL, msg);
 	VALID(EBADF, psmq->qpub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 
@@ -373,7 +250,7 @@ int psmq_receive_msg
    ========================================================================== */
 
 
-int psmq_timedreceive_msg
+int psmq_timedreceive
 (
 	struct psmq      *psmq,  /* psmq object */
 	struct psmq_msg  *msg,   /* received message */
@@ -382,10 +259,13 @@ int psmq_timedreceive_msg
 )
 {
 	VALID(EINVAL, psmq);
+	VALID(EINVAL, msg);
+	VALID(EINVAL, tp);
 	VALID(EBADF, psmq->qpub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 
-	return mq_timedreceive(psmq->qsub, (char *)msg, sizeof(*msg), prio, tp);
+	return -(mq_timedreceive(psmq->qsub, (char *)msg,
+				sizeof(*msg), prio, tp) == -1);
 }
 
 
@@ -398,7 +278,6 @@ int psmq_timedreceive_msg
 
     errno:
             EINVAL      psmq is invalid (null)
-            EINVAL      clbk is invalid (null)
             EBADF       psmq was not properly initialized
             ENOTCONN    psmq object is not enabled and cannot receive msgs
             ETIMEDOUT   timeout occured and message did not arrive
@@ -409,7 +288,7 @@ int psmq_timedreceive_msg
    ========================================================================== */
 
 
-int psmq_timedreceive_msg_ms
+int psmq_timedreceive_ms
 (
 	struct psmq      *psmq,  /* psmq object */
 	struct psmq_msg  *msg,   /* received message */
@@ -421,11 +300,13 @@ int psmq_timedreceive_msg_ms
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 	VALID(EINVAL, psmq);
+	VALID(EINVAL, msg);
 	VALID(EBADF, psmq->qpub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 
 	psmq_ms_to_tp(ms, &tp);
-	return mq_timedreceive(psmq->qsub, (char *)msg, sizeof(*msg), prio, &tp);
+	return -(mq_timedreceive(psmq->qsub, (char *)msg,
+				sizeof(*msg), prio, &tp) == -1);
 }
 
 
@@ -508,7 +389,7 @@ int psmq_init
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-		if ((ack = psmq_receive_msg(psmq, &msg, NULL)) == -1)
+		if ((ack = psmq_receive(psmq, &msg, NULL)) == -1)
 			break;
 
 		/* open response is suppose to send back
@@ -610,6 +491,7 @@ int psmq_subscribe
 	VALID(EINVAL, psmq);
 	VALID(EINVAL, topic);
 	VALID(EINVAL, topic[0] != '\0');
+	VALID(EBADMSG, topic[0] == '/');
 	VALID(EBADF, psmq->qsub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 	VALID(ENOBUFS, strlen(topic) + 1 <= PSMQ_MSG_MAX);
@@ -638,6 +520,7 @@ int psmq_unsubscribe
 	VALID(EINVAL, psmq);
 	VALID(EINVAL, topic);
 	VALID(EINVAL, topic[0] != '\0');
+	VALID(EBADMSG, topic[0] == '/');
 	VALID(EBADF, psmq->qsub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 	VALID(ENOBUFS, strlen(topic) + 1 <= PSMQ_MSG_MAX);
@@ -645,26 +528,4 @@ int psmq_unsubscribe
 	/* send subscribe request to the server */
 	return psmq_publish_msg(psmq, PSMQ_CTRL_CMD_UNSUBSCRIBE,
 			psmq->fd, topic, NULL, 0, 0);
-}
-
-
-/* ==========================================================================
-    Sets callback that shall be called when message is received during
-    psmq_receive() function.
-   ========================================================================== */
-
-
-int psmq_set_on_receive_clbk
-(
-	struct psmq          *psmq,      /* psmq object */
-	psmq_on_receive_clbk  clbk,      /* callback to call when msg is received */
-	void                 *userdata   /* userdata passed to callback */
-)
-{
-	VALID(EINVAL, psmq);
-
-	psmq->on_receive_clbk = clbk;
-	psmq->userdata = userdata;
-
-	return 0;
 }
