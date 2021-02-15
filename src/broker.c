@@ -277,17 +277,11 @@ static int psmqd_broker_reply_mq
 
 	memcpy(msg.data + topiclen, payload, paylen);
 
-	/* wait for up to 100ms for client to free
-	 * space in his mqueue */
-	clock_gettime(CLOCK_REALTIME, &tp);
-	tp.tv_nsec += 100000000l;
-
-	if (tp.tv_nsec >= 1000000000l)
-	{
-		tp.tv_sec += 1;
-		tp.tv_nsec -= 1000000000l;
-	}
-
+	/* send data to client, but do not wait if its queue
+	 * is full, if it cannot process messages quick enough
+	 * it does not deserver new message */
+	tp.tv_sec = 0;
+	tp.tv_nsec = 0;
 	return mq_timedsend(mq, (char *)&msg, psmq_real_msg_size(msg), prio, &tp);
 }
 
