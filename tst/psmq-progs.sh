@@ -26,10 +26,6 @@ psmqs_bin="../src/psmq-sub"
 psmqp_bin="../src/psmq-pub"
 
 
-psmq_msg_topic_len=
-psmq_msg_payload_len=
-psmq_msg_pub_topic_len=
-psmq_msg_pub_paylen_len=
 
 
 ## ==========================================================================
@@ -113,13 +109,7 @@ start_psmqd()
 
     psmq_grep "n/created" ${psmqd_log}
 
-    psmq_msg_topic_len=$(cat ${psmqd_log} | grep PSMQ_MSG_TOPIC \
-        | cut -f3 -d] | cut -f3 -d\ )
-    psmq_msg_payload_len=$(cat ${psmqd_log} | grep PSMQ_MSG_PAYLOAD \
-        | cut -f3 -d] | cut -f3 -d\ )
-    psmq_msg_pub_topic_len=$(cat ${psmqd_log} | grep PSMQ_MSG_PUB_TOPIC \
-        | cut -f3 -d] | cut -f3 -d\ )
-    psmq_msg_pub_paylen_len=$(cat ${psmqd_log} | grep PSMQ_MSG_PUB_PAYLOAD \
+    psmq_msg_max=$(cat ${psmqd_log} | grep PSMQ_MSG_MAX \
         | cut -f3 -d] | cut -f3 -d\ )
 }
 
@@ -238,14 +228,14 @@ psmq_sub_broker_doesnt_exist()
 }
 psmq_sub_qname_too_long()
 {
-    psmqs_qname="/$(randstr ${psmq_msg_pub_paylen_len})"
+    psmqs_qname="/$(randstr ${psmq_msg_max})"
     ${psmqs_bin} -n${psmqs_qname} -b/surely-i-dont-exist 2> ${psmqs_stderr}
-    mt_fail "psmq_grep \"f/queue name is too long ($((psmq_msg_pub_paylen_len + 1))), max is $((psmq_msg_pub_paylen_len - 1))\" \
+    mt_fail "psmq_grep \"f/queue name is too long ($((psmq_msg_max + 1))), max is $((psmq_msg_max - 1))\" \
         \"${psmqs_stderr}\""
 }
 psmq_sub_topic_too_long()
 {
-    topic="/$(randstr ${psmq_msg_pub_paylen_len})"
+    topic="/$(randstr ${psmq_msg_max})"
     ${psmqs_bin} -n${psmqs_name} -b${broker_name} -t${topic} 2> ${psmqs_stderr}
     mt_fail "psmq_grep \"subscribe failed, topic ${topic} is too long\" \
         \"${psmqs_stderr}\""
@@ -295,8 +285,7 @@ psmq_sub_unknown_argument()
 psmq_sub_no_arguments()
 {
     ${psmqs_bin} 2> ${psmqs_stderr}
-    mt_fail "psmq_grep \"f/failed to enable client, missing -b options\" \
-        \"${psmqs_stderr}\""
+    mt_fail "psmq_grep \"missing -b option\" \"${psmqs_stderr}\""
 }
 psmq_sub_broker_go_down_before_client()
 {
@@ -331,21 +320,21 @@ psmq_pub_broker_doesnt_exist()
 }
 psmq_pub_qname_too_long()
 {
-    psmqp_qname="/$(randstr ${psmq_msg_pub_paylen_len})"
+    psmqp_qname="/$(randstr $((psmq_msg_max - 1)))"
     ${psmqp_bin} -n${psmqp_qname} -b${broker_name} -t/t 2> ${psmqp_stderr}
-    mt_fail "psmq_grep \"f/queue name is too long ($((psmq_msg_pub_paylen_len + 1))), max is $((psmq_msg_pub_paylen_len - 1))\" \
+    mt_fail "psmq_grep \"f/queue name is too long ($((psmq_msg_max))), max is $((psmq_msg_max - 1))\" \
         \"${psmqp_stderr}\""
 }
 psmq_pub_message_too_long()
 {
-    msg="$(randstr $((psmq_msg_pub_paylen_len + 1)) )"
+    msg="$(randstr $((psmq_msg_max + 1)) )"
     ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/t -m${msg} 2> ${psmqp_stderr}
     mt_fail "psmq_grep \"f/topic or message is too long\" \
         \"${psmqp_stderr}\""
 }
 psmq_pub_topic_too_long()
 {
-    topic="$(randstr $((psmq_msg_pub_paylen_len + 1)) )"
+    topic="$(randstr $((psmq_msg_max + 1)) )"
     ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/${topic} -mmsg 2> ${psmqp_stderr}
     mt_fail "psmq_grep \"f/topic or message is too long\" \
         \"${psmqp_stderr}\""
@@ -408,31 +397,32 @@ psmq_pub_from_stdin()
 psmq_pub_from_stdin_max_line()
 {
     start_psmqs
-    msg="$(randstr $((psmq_msg_payload_len - 2)) )"
+    # -2 since line consists of "\n\0"
+    # -3 since topic is 3 bytes long "/1\0";
+    msg="$(randstr $((psmq_msg_max - 2 - 3)) )"
     echo "${msg}" | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1
     mt_fail "psmq_grep $(echo ${msg} | cut -c-16) \"${psmqs_stdout}\""
     stop_psmqs
 }
 psmq_pub_from_stdin_too_long_line()
 {
-    msg="$(randstr $((psmq_msg_payload_len - 1)) )"
+    # -2 since line consists of "\n\0"
+    # -3 since topic is 3 bytes long "/1\0";
+    # +1 because we want to exceed buffer to cause error
+    msg="$(randstr $((psmq_msg_max - 2 - 3 + 1)) )"
     echo "${msg}" | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 2> \
         ${psmqp_stderr}
-    mt_fail "psmq_grep \"f/line is too long, max line is $((psmq_msg_payload_len - 2))\" \
+    mt_fail "psmq_grep \"f/line is too long, max line is $((psmq_msg_max - 5))\" \
         \"${psmqp_stderr}\""
 }
 psmq_pub_from_stdin_too_long_topic()
 {
-    topic_len=${psmq_msg_payload_len}
-    if [ ${psmq_msg_topic_len} -gt ${psmq_msg_payload_len} ]
-    then
-        topic_len=${psmq_msg_pub_topic_len}
-    fi
+    topic_len=${psmq_msg_max}
     topic_len=$((topic_len + 1))
     topic="/$(randstr ${topic_len} )"
     echo "msg" | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t${topic} 2> \
         ${psmqp_stderr}
-    mt_fail "psmq_grep \"f/topic is too long\" \
+    mt_fail "psmq_grep \"f/topic is too long, max is 254\" \
         \"${psmqp_stderr}\""
 }
 psmq_pub_from_stdin_invalid_topic()
@@ -445,10 +435,12 @@ psmq_pub_from_stdin_invalid_topic()
 psmq_pub_from_stdin_multi_line()
 {
     start_psmqs
-    msg1="$(randstr $((psmq_msg_payload_len - 2)) )"
-    msg2="$(randstr $((psmq_msg_payload_len - 2)) )"
-    msg3="$(randstr 2 )"
-    msg4="$(randstr $((psmq_msg_payload_len - 2)) )"
+    # -2 since line consists of "\n\0"
+    # -3 since topic is 3 bytes long "/1\0";
+    msg1="$(randstr $((psmq_msg_max - 3 - 2)) )"
+    msg2="$(randstr $((psmq_msg_max - 3 - 2)) )"
+    msg3="$(randstr 2)"
+    msg4="$(randstr $((psmq_msg_max - 3 - 2)) )"
     msg5="$(randstr 2)"
 
     printf "%s\n%s\n%s\n%s\n%s\n" ${msg1} ${msg2} ${msg3} ${msg4} ${msg5} | \
@@ -473,8 +465,7 @@ psmq_pub_with_prio()
 psmq_pub_with_invalid_prio()
 {
     start_psmqs
-    msg="$(randstr $((psmq_msg_payload_len - 1)) )"
-    ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -m${msg} -p7812364 \
+    ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -mtest -p7812364 \
         2> ${psmqp_stderr}
     mt_fail "psmq_grep \"f/failed to publish, invalid prio 7812364\" \
         \"${psmqp_stderr}\""
@@ -526,7 +517,7 @@ psmqd_print_version()
 psmq_progs_simple_pub_sub()
 {
     start_psmqs
-    msg="$(randstr $((psmq_msg_payload_len - 1)) )"
+    msg="$(randstr $((psmq_msg_max - 4)) )"
     ${psmqp_bin} -b${broker_name} -n${psmqp_name} -t/1 -m${msg}
     mt_fail "psmq_grep $(echo ${msg} | cut -c-16) \"${psmqs_stdout}\""
     stop_psmqs
@@ -574,7 +565,7 @@ mt_run psmq_pub_missing_b_argument
 mt_run psmq_pub_missing_t_argument
 mt_run psmq_sub_topic_too_long
 
-if [ ${psmq_msg_payload_len} -gt 2 ]
+if [ ${psmq_msg_max} -gt 2 ]
 then
     ###
     # since line is '\n' and then '\0' for sending a string,

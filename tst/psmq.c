@@ -62,73 +62,6 @@ static void psmq_initialize(void)
    ========================================================================== */
 
 
-static void psmq_initialize_null_psmq(void)
-{
-	mt_ferr(psmq_init(NULL, "/b", "/q", 10), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_initialize_null_broker_name(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	mt_ferr(psmq_init(&psmq, NULL, "/q", 10), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_initialize_null_queue_name(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	mt_ferr(psmq_init(&psmq, "/b", NULL, 10), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_initialize_invalid_maxmsg(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	mt_ferr(psmq_init(&psmq, "/b", "/q", -1), EINVAL);
-	mt_ferr(psmq_init(&psmq, "/b", "/q", 0), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_initialize_bad_queue_name(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	mt_ferr(psmq_init(&psmq, "b",  "/q", 10), EINVAL);
-	mt_ferr(psmq_init(&psmq, "/b", "q", 10), EINVAL);
-	mt_ferr(psmq_init(&psmq, "",   "/q", 10), EINVAL);
-	mt_ferr(psmq_init(&psmq, "/b", "", 10), EINVAL);
-	mq_unlink("/q");
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
 static void psmq_initialize_queue_not_exist(void)
 {
 	struct psmq  psmq;
@@ -144,20 +77,16 @@ static void psmq_initialize_queue_not_exist(void)
    ========================================================================== */
 
 
-static void psmq_initialize_queue_too_long(void)
+static void psmq_sub_max_topic_minus_one(void)
 {
-	char         qname[size_of_member(struct psmq_msg_pub, payload) + 10];
-	struct psmq  psmq;
+	char         topic[PSMQ_MSG_MAX - 1];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-	psmqt_gen_queue_name(qname, sizeof(qname));
 
-	/* if buffer is bigger than generated queue name,
-	 * then there is no way we can test it, assume ok */
-	if (strlen(qname) <= sizeof(qname))
-		return;
-
-	mt_ferr(psmq_init(&psmq, "/b",  qname, 10), ENAMETOOLONG);
+	psmqt_gen_random_string(topic, sizeof(topic));
+	topic[0] = '/';
+	mt_fok(psmq_subscribe(&gt_sub_psmq, topic));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 's', 0, 0, topic, NULL));
 }
 
 
@@ -165,18 +94,15 @@ static void psmq_initialize_queue_too_long(void)
    ========================================================================== */
 
 
-static void psmq_sub(void)
+static void psmq_sub_max_topic_plus_one(void)
 {
-	char         qname[QNAME_LEN];
-	struct psmq  psmq;
+	char         topic[PSMQ_MSG_MAX + 1];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	psmqt_gen_queue_name(qname, sizeof(qname));
-	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
-	mt_fok(psmq_subscribe(&psmq, "/t"));
-	mt_assert(psmq_cleanup(&psmq) == 0);
-	mq_unlink(qname);
+	psmqt_gen_random_string(topic, sizeof(topic));
+	topic[0] = '/';
+	mt_ferr(psmq_subscribe(&gt_pub_psmq, topic), ENOBUFS);
 }
 
 
@@ -186,217 +112,14 @@ static void psmq_sub(void)
 
 static void psmq_sub_max_topic(void)
 {
-	char         topic[PSMQ_TOPIC_MAX + 1];
-	char         qname[QNAME_LEN];
-	struct psmq  psmq;
+	char         topic[PSMQ_MSG_MAX];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	psmqt_gen_queue_name(qname, sizeof(qname));
 	psmqt_gen_random_string(topic, sizeof(topic));
 	topic[0] = '/';
-	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
-	mt_fok(psmq_subscribe(&psmq, topic));
-	mt_assert(psmq_cleanup(&psmq) == 0);
-	mq_unlink(qname);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_sub_null_topic(void)
-{
-	mt_ferr(psmq_subscribe(&gt_pub_psmq, NULL), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_sub_empty_topic(void)
-{
-	mt_ferr(psmq_subscribe(&gt_pub_psmq, ""), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_sub_too_long_topic(void)
-{
-	char  topic[PSMQ_TOPIC_MAX + 10];
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	psmqt_gen_random_string(topic, sizeof(topic));
-	mt_ferr(psmq_subscribe(&gt_pub_psmq, topic), ENOBUFS);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_sub_uninitialized(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	memset(&psmq, 0x00, sizeof(psmq));
-	mt_ferr(psmq_subscribe(&psmq, "/t"), EBADF);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_unsub_uninitialized(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	memset(&psmq, 0x00, sizeof(psmq));
-	mt_ferr(psmq_unsubscribe(&psmq, "/t"), EBADF);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_unsub_empty_topic(void)
-{
-	mt_ferr(psmq_unsubscribe(&gt_pub_psmq, ""), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_unsub_too_long_topic(void)
-{
-	char  topic[PSMQ_TOPIC_MAX + 10];
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	psmqt_gen_random_string(topic, sizeof(topic));
-	mt_ferr(psmq_unsubscribe(&gt_pub_psmq, topic), ENOBUFS);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_cleanup_uninitialized(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	memset(&psmq, 0x00, sizeof(psmq));
-	mt_ferr(psmq_cleanup(&psmq), EBADF);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_pub_uninitialized(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	memset(&psmq, 0x00, sizeof(psmq));
-	mt_ferr(psmq_publish(&psmq, "/t", NULL, 0, 0), EBADF);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_enable_uninitialized(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	memset(&psmq, 0x00, sizeof(psmq));
-	mt_ferr(psmq_enable(&psmq, 1), EBADF);
-	mt_ferr(psmq_disable_threaded(&psmq), EBADF);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_enable_invalid_value(void)
-{
-	mt_ferr(psmq_enable(&gt_pub_psmq, 2), EINVAL);
-	mt_ferr(psmq_enable(&gt_pub_psmq, 10), EINVAL);
-	mt_ferr(psmq_enable(&gt_pub_psmq, -1), EINVAL);
-	mt_ferr(psmq_enable(&gt_pub_psmq, -10), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_receive_uninitialized(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	memset(&psmq, 0x00, sizeof(psmq));
-	mt_ferr(psmq_receive(&psmq, psmqt_msg_receiver, NULL), EBADF);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_timedreceive_uninitialized(void)
-{
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	memset(&psmq, 0x00, sizeof(psmq));
-	mt_ferr(psmq_timedreceive_ms(&psmq, psmqt_msg_receiver, NULL, 100),
-			EBADF);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_sub_null_psmq(void)
-{
-	mt_ferr(psmq_subscribe(NULL, "/t"), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_unsub_null_psmq(void)
-{
-	mt_ferr(psmq_unsubscribe(NULL, "/t"), EINVAL);
+	mt_fok(psmq_subscribe(&gt_sub_psmq, topic));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 's', 0, 0, topic, NULL));
 }
 
 
@@ -406,68 +129,9 @@ static void psmq_unsub_null_psmq(void)
 
 static void psmq_unsub_not_subscribed(void)
 {
-	mt_ferr(psmq_unsubscribe(&gt_pub_psmq, "/x"), ENOENT);
+	mt_fok(psmq_unsubscribe(&gt_sub_psmq, "/x"));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'u', ENOENT, 0, "/x", NULL));
 }
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_cleanup_null_psmq(void)
-{
-	mt_ferr(psmq_cleanup(NULL), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_pub_null_psmq(void)
-{
-	mt_ferr(psmq_publish(NULL, "/t", NULL, 0, 0), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_pub_null_topic(void)
-{
-	mt_ferr(psmq_publish(&gt_pub_psmq, NULL, NULL, 0, 0), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_pub_too_big_topic(void)
-{
-	char  topic[PSMQ_TOPIC_MAX + 10];
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	psmqt_gen_random_string(topic, sizeof(topic));
-
-	mt_ferr(psmq_publish(&gt_pub_psmq, topic, NULL, 0, 0), ENOBUFS);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_pub_too_big_message(void)
-{
-	char  payload[PSMQ_PAYLOAD_MAX + 10];
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	psmqt_gen_random_string(payload, sizeof(payload));
-	mt_ferr(psmq_publish(&gt_pub_psmq, "/t", payload, sizeof(payload), 0),
-			ENOBUFS);
-}
-
 
 /* ==========================================================================
    ========================================================================== */
@@ -483,81 +147,10 @@ static void psmq_pub_paylen_and_payload_null(void)
    ========================================================================== */
 
 
-static void psmq_enable_null_psmq(void)
-{
-	mt_ferr(psmq_enable(NULL, 1), EINVAL);
-	mt_ferr(psmq_disable_threaded(NULL), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_receive_null_psmq(void)
-{
-	mt_ferr(psmq_receive(NULL, psmqt_msg_receiver, NULL), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_timedreceive_null_psmq(void)
-{
-	mt_ferr(psmq_timedreceive(NULL, psmqt_msg_receiver, NULL, NULL), EINVAL);
-	mt_ferr(psmq_timedreceive_ms(NULL, psmqt_msg_receiver, NULL, 1), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
 static void psmq_unsub(void)
 {
-	char         qname[QNAME_LEN];
-	struct psmq  psmq;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	psmqt_gen_queue_name(qname, sizeof(qname));
-	mt_fok(psmq_init(&psmq, gt_broker_name, qname, 10));
-	mt_fok(psmq_subscribe(&psmq, "/t"));
-	mt_fok(psmq_unsubscribe(&psmq, "/t"));
-	mt_fok(psmq_cleanup(&psmq));
-	mq_unlink(qname);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_enable_disable(void)
-{
-	char             qname[QNAME_LEN];
-	struct psmq      psmq;
-	struct psmq_msg  msg;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	psmqt_gen_queue_name(qname, sizeof(qname));
-	mt_fok(psmq_init(&psmq, gt_broker_name, qname, 10));
-	mt_fok(psmq_subscribe(&psmq, "/t"));
-	mt_fok(psmq_enable(&psmq, 1));
-	mt_fok(psmq_enable(&psmq, 0));
-	mt_fok(psmq_enable(&psmq, 1));
-	mt_fok(psmq_disable_threaded(&psmq));
-	mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-	mt_fail(strcmp(msg.topic, "-d") == 0);
-	mt_fail(*(unsigned char*)msg.payload == 0);
-	mt_fail(msg.paylen == 1);
-	psmq.enabled = 0;
-	mt_ferr(psmq_receive(&psmq, psmqt_msg_receiver, &msg), ENOTCONN);
-	mt_fok(psmq_cleanup(&psmq));
-	mq_unlink(qname);
+	mt_fok(psmq_unsubscribe(&gt_sub_psmq, "/t"));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'u', 0, 0, "/t", NULL));
 }
 
 
@@ -567,17 +160,15 @@ static void psmq_enable_disable(void)
 
 static void psmq_publish_receive(void)
 {
-	char             buf[PSMQ_PAYLOAD_MAX];
-	struct psmq_msg  msg;
+	/* -3 because, topic and data shares single buffer, and 3 bytes
+	 * are taken by topic "/t\0" */
+	char   buf[PSMQ_MSG_MAX - 3];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
 	psmqt_gen_random_string(buf, sizeof(buf));
 	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-	mt_fail(memcmp(msg.payload, buf, sizeof(buf)) == 0);
-	mt_fail(strcmp(msg.topic, "/t") == 0);
-	mt_fail(msg.paylen == sizeof(buf));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf), "/t", buf));
 }
 
 
@@ -588,10 +179,9 @@ static void psmq_publish_receive(void)
 static void psmq_publish_with_prio(void)
 {
 
-	char             buf0[PSMQ_PAYLOAD_MAX];
-	char             buf1[PSMQ_PAYLOAD_MAX];
-	char             buf2[PSMQ_PAYLOAD_MAX];
-	struct psmq_msg  msg;
+	char             buf0[PSMQ_MSG_MAX - 3];
+	char             buf1[PSMQ_MSG_MAX - 3];
+	char             buf2[PSMQ_MSG_MAX - 3];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -608,22 +198,9 @@ static void psmq_publish_with_prio(void)
 
 	sleep(1);
 
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-	mt_fail(memcmp(msg.payload, buf1, sizeof(buf1)) == 0);
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-	mt_fail(memcmp(msg.payload, buf2, sizeof(buf2)) == 0);
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-	mt_fail(memcmp(msg.payload, buf0, sizeof(buf0)) == 0);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_publish_with_invalid_prio(void)
-{
-	mt_ferr(psmq_publish(&gt_pub_psmq, "/t", NULL, 0, UINT_MAX), EINVAL);
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf1), "/t", buf1));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf2), "/t", buf2));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf0), "/t", buf0));
 }
 
 
@@ -633,26 +210,27 @@ static void psmq_publish_with_invalid_prio(void)
 
 static void psmq_publish_timedreceive(void)
 {
-	char             buf[PSMQ_PAYLOAD_MAX];
+	char             buf[PSMQ_MSG_MAX - 3];
 	struct psmq_msg  msg;
+	struct timespec  tp;
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
+	clock_gettime(CLOCK_REALTIME, &tp);
+	tp.tv_sec += 1;
 	psmqt_gen_random_string(buf, sizeof(buf));
 	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
-	mt_fok(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 999));
+	mt_fok(psmq_timedreceive(&gt_sub_psmq, &msg, NULL, &tp));
+	tp.tv_sec = 0;
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
-	 * to return EINTR instead of ETIMEDOUT when timeout occurs
-	 */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			EINTR);
+	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
+	mt_ferr(psmq_timedreceive(&gt_sub_psmq, &msg, NULL, &tp), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			ETIMEDOUT);
+	mt_ferr(psmq_timedreceive(&gt_sub_psmq, &msg, NULL, &tp), ETIMEDOUT);
 #endif
-	mt_fail(memcmp(msg.payload, buf, sizeof(buf)) == 0);
-	mt_fail(strcmp(msg.topic, "/t") == 0);
+	mt_fail(strcmp(msg.data, "/t") == 0);
+	mt_fail(memcmp(msg.data + 3, buf, sizeof(buf)) == 0);
 	mt_fail(msg.paylen == sizeof(buf));
 }
 
@@ -661,29 +239,26 @@ static void psmq_publish_timedreceive(void)
    ========================================================================== */
 
 
-static void psmq_publish_timedreceive_wrong_timespec(void)
+static void psmq_publish_timedreceive_ms(void)
 {
-	struct timespec  tp;
+	char             buf[PSMQ_MSG_MAX - 3];
 	struct psmq_msg  msg;
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	tp.tv_sec = 5;
-	tp.tv_nsec = 1000000001l;
-	mt_ferr(psmq_timedreceive(&gt_sub_psmq, NULL, &msg, &tp), EINVAL);
-}
-
-
-/* ==========================================================================
-   ========================================================================== */
-
-
-static void psmq_publish_timedreceive_null_timespec(void)
-{
-	struct psmq_msg  msg;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	mt_ferr(psmq_timedreceive(&gt_sub_psmq, NULL, &msg, NULL), EINVAL);
+	psmqt_gen_random_string(buf, sizeof(buf));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
+	mt_fok(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 999));
+#if __QNX__ || __QNXNTO
+	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
+	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
+#else
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
+#endif
+	mt_fail(strcmp(msg.data, "/t") == 0);
+	mt_fail(memcmp(msg.data + 3, buf, sizeof(buf)) == 0);
+	mt_fail(msg.paylen == sizeof(buf));
 }
 
 
@@ -693,15 +268,8 @@ static void psmq_publish_timedreceive_null_timespec(void)
 
 static void psmq_sub_after_init(void)
 {
-	struct psmq_msg  msg;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
 	mt_fok(psmq_subscribe(&gt_sub_psmq, "/x"));
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-	mt_fail(strcmp(msg.topic, "-s") == 0);
-	mt_fail(*(unsigned char*)msg.payload == 0);
-	mt_fail(msg.paylen == 1);
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 's', 0, 0, "/x", NULL));
 }
 
 
@@ -711,15 +279,8 @@ static void psmq_sub_after_init(void)
 
 static void psmq_unsub_after_init(void)
 {
-	struct psmq_msg  msg;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	mt_fok(psmq_subscribe(&gt_sub_psmq, "/t"));
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-	mt_fail(strcmp(msg.topic, "-s") == 0);
-	mt_fail(*(unsigned char*)msg.payload == 0);
-	mt_fail(msg.paylen == 1);
+	mt_fok(psmq_unsubscribe(&gt_sub_psmq, "/t"));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'u', 0, 0, "/t", NULL));
 }
 
 
@@ -779,65 +340,120 @@ static void psmq_initialize_too_much_clients(void)
 
 void psmq_test_group(void)
 {
-	/* tests that creates own custom set of
-	 * clients, and only need broker to start/stop
-	 * */
+	struct psmq      psmq_uninit;
+	struct psmq      psmq;
+	struct psmq_msg  msg;
+	char             qname[QNAME_LEN];
+	char             buf[PSMQ_MSG_MAX + 10];
+	char             long_qname[512];
+	struct timespec  tp;
+	struct timespec  tp_inval;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+	tp_inval.tv_sec = -1;
+	tp_inval.tv_nsec = 0;
+	memset(&tp, 0x00, sizeof(tp));
+	memset(&psmq_uninit, 0x00, sizeof(psmq));
+	psmqt_gen_queue_name(qname, sizeof(qname));
+	psmq_init(&psmq, gt_broker_name, qname, 10);
+	psmqt_gen_random_string(buf, sizeof(buf));
+	psmqt_gen_random_string(long_qname, sizeof(long_qname));
+	long_qname[0] = '/';
+	buf[0] = '/';
+
+#define CHECK_ERR(f, e) mt_run_quick(f == -1 && errno == e)
+	CHECK_ERR(psmq_init(NULL, "/b",  "/q", 10), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, NULL, "/q", 10), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, "/b", NULL, 10), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, "b",  "/q", 10), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, "/b", "q",  10), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, "",   "/q", 10), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, "/b", "",   10), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, "/b", "/q",  0), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, "/b", "/q", -1), EINVAL);
+	CHECK_ERR(psmq_init(&psmq, buf,  "/q", 10), ENAMETOOLONG);
+	CHECK_ERR(psmq_cleanup(NULL), EINVAL);
+	CHECK_ERR(psmq_cleanup(&psmq_uninit), EBADF);
+
+	CHECK_ERR(psmq_publish(NULL, "/t", NULL, 0, 0), EINVAL);
+	CHECK_ERR(psmq_publish(&psmq_uninit, "/t", NULL, 0, 0), EBADF);
+	CHECK_ERR(psmq_publish(&psmq, NULL, NULL, 0, 0), EINVAL);
+	CHECK_ERR(psmq_publish(&psmq, "t", NULL, 0, 0), EBADMSG);
+	psmqt_gen_random_string(buf, sizeof(buf));
+	buf[0] = '/';
+	CHECK_ERR(psmq_publish(&psmq, buf, NULL, 0, 0), ENOBUFS);
+	buf[PSMQ_MSG_MAX] = '\0';
+	CHECK_ERR(psmq_publish(&psmq, buf, NULL, 0, 0), ENOBUFS);
+	buf[1] = 't';
+	buf[2] = '\0';
+	CHECK_ERR(psmq_publish(&psmq, buf, NULL, PSMQ_MSG_MAX, 0), ENOBUFS);
+	CHECK_ERR(psmq_publish(&psmq, buf, NULL, PSMQ_MSG_MAX - 2, 0), ENOBUFS);
+
+	CHECK_ERR(psmq_receive(NULL, &msg, NULL), EINVAL);
+	CHECK_ERR(psmq_receive(&psmq_uninit, &msg, NULL), EBADF);
+	CHECK_ERR(psmq_timedreceive(NULL, &msg, NULL, &tp), EINVAL);
+	CHECK_ERR(psmq_timedreceive(&psmq_uninit, &msg, NULL, &tp), EBADF);
+	CHECK_ERR(psmq_timedreceive_ms(NULL, &msg, NULL, 0), EINVAL);
+	CHECK_ERR(psmq_timedreceive_ms(&psmq_uninit, &msg, NULL, 0), EBADF);
+
+	CHECK_ERR(psmq_subscribe(NULL, "/t"), EINVAL);
+	CHECK_ERR(psmq_subscribe(&psmq_uninit, "/t"), EBADF);
+
+	CHECK_ERR(psmq_unsubscribe(NULL, "/t"), EINVAL);
+	CHECK_ERR(psmq_unsubscribe(&psmq_uninit, "/t"), EBADF);
+
+	/* tests that creates own custom set of
+	 * clients, and only need broker to start/stop */
 	mt_prepare_test = psmqt_prepare_test;
 	mt_cleanup_test = psmqt_cleanup_test;
 
-	mt_run(psmq_cleanup_null_psmq);
-	mt_run(psmq_cleanup_uninitialized);
-	mt_run(psmq_enable_disable);
-	mt_run(psmq_enable_null_psmq);
-	mt_run(psmq_enable_uninitialized);
 	mt_run(psmq_initialize);
-	mt_run(psmq_initialize_bad_queue_name);
-	mt_run(psmq_initialize_invalid_maxmsg);
-	mt_run(psmq_initialize_null_broker_name);
-	mt_run(psmq_initialize_null_psmq);
-	mt_run(psmq_initialize_null_queue_name);
 	mt_run(psmq_initialize_queue_not_exist);
-	mt_run(psmq_initialize_queue_too_long);
 	mt_run(psmq_initialize_too_much_clients);
-	mt_run(psmq_pub_null_psmq);
-	mt_run(psmq_pub_uninitialized);
-	mt_run(psmq_receive_null_psmq);
-	mt_run(psmq_receive_uninitialized);
-	mt_run(psmq_sub);
-	mt_run(psmq_sub_null_psmq);
-	mt_run(psmq_timedreceive_null_psmq);
-	mt_run(psmq_timedreceive_uninitialized);
-	mt_run(psmq_unsub);
-	mt_run(psmq_unsub_null_psmq);
-	mt_run(psmq_sub_max_topic);
 
 	/* tests that needs broker and use default set
 	 * of clients for testing, one subscriber and
 	 * one publisher */
-
 	mt_prepare_test = psmqt_prepare_test_with_clients;
 	mt_cleanup_test = psmqt_cleanup_test_with_clients;
 
-	mt_run(psmq_enable_invalid_value);
-	mt_run(psmq_pub_null_topic);
+	CHECK_ERR(psmq_receive(&gt_pub_psmq, NULL, NULL), EINVAL);
+
+	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, NULL, NULL, &tp), EINVAL);
+	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, &msg, NULL, NULL), EINVAL);
+	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, &msg, NULL, &tp_inval), EINVAL);
+	CHECK_ERR(psmq_timedreceive_ms(&gt_pub_psmq, NULL, NULL, 0), EINVAL);
+
+	CHECK_ERR(psmq_subscribe(&gt_pub_psmq, NULL), EINVAL);
+	CHECK_ERR(psmq_subscribe(&gt_pub_psmq, ""), EINVAL);
+	CHECK_ERR(psmq_subscribe(&gt_pub_psmq, "t"), EBADMSG);
+	psmqt_gen_random_string(buf, sizeof(buf));
+	buf[0] = '/';
+	CHECK_ERR(psmq_subscribe(&gt_pub_psmq, buf), ENOBUFS);
+	buf[PSMQ_MSG_MAX] = '\0';
+	CHECK_ERR(psmq_subscribe(&gt_pub_psmq, buf), ENOBUFS);
+
+	CHECK_ERR(psmq_unsubscribe(&gt_pub_psmq, NULL), EINVAL);
+	CHECK_ERR(psmq_unsubscribe(&gt_pub_psmq, ""), EINVAL);
+	CHECK_ERR(psmq_unsubscribe(&gt_pub_psmq, "t"), EBADMSG);
+	psmqt_gen_random_string(buf, sizeof(buf));
+	buf[0] = '/';
+	CHECK_ERR(psmq_unsubscribe(&gt_pub_psmq, buf), ENOBUFS);
+	buf[PSMQ_MSG_MAX] = '\0';
+	CHECK_ERR(psmq_unsubscribe(&gt_pub_psmq, buf), ENOBUFS);
+
+
+
+	mt_run(psmq_unsub);
+	mt_run(psmq_sub_max_topic);
+	mt_run(psmq_sub_max_topic_plus_one);
+	mt_run(psmq_sub_max_topic_minus_one);
 	mt_run(psmq_pub_paylen_and_payload_null);
-	mt_run(psmq_pub_too_big_message);
-	mt_run(psmq_pub_too_big_topic);
 	mt_run(psmq_publish_receive);
 	mt_run(psmq_publish_with_prio);
-	mt_run(psmq_publish_with_invalid_prio);
 	mt_run(psmq_publish_timedreceive);
-	mt_run(psmq_publish_timedreceive_wrong_timespec);
-	mt_run(psmq_publish_timedreceive_null_timespec);
+	mt_run(psmq_publish_timedreceive_ms);
 	mt_run(psmq_sub_after_init);
-	mt_run(psmq_sub_empty_topic);
-	mt_run(psmq_sub_null_topic);
-	mt_run(psmq_sub_too_long_topic);
-	mt_run(psmq_sub_uninitialized);
 	mt_run(psmq_unsub_after_init);
-	mt_run(psmq_unsub_empty_topic);
 	mt_run(psmq_unsub_not_subscribed);
-	mt_run(psmq_unsub_too_long_topic);
-	mt_run(psmq_unsub_uninitialized);
 }

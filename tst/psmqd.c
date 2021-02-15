@@ -64,6 +64,11 @@ struct multi_ps_targs
 	int               id;       /* id of the pub thread */
 };
 
+/* Function exported from libpsmq, even tho it is exported publicly
+ * it's declaration can't be found in include files and is intended
+ * for internal use only, like in tests. */
+int psmq_publish_msg(struct psmq *psmq, char cmd, unsigned char data,
+	const char *topic, const void *payload, size_t paylen, unsigned int prio);
 
 /* ==========================================================================
                   _                __           ____
@@ -76,49 +81,8 @@ struct multi_ps_targs
 
 
 /* ==========================================================================
-    Gets data received from broker and puts topic and payload into passed
-    list. Function exits with -1 when either control message comes int or
-    function fails to add data to the list
-   ========================================================================== */
-
-
-static int multi_sub_clbk
-(
-	char             *topic,    /* topic of data received from broker */
-	void             *payload,  /* data received from broker */
-	size_t            paylen,   /* size of the payload */
-	unsigned int      prio,     /* received message priority */
-	void             *arg       /* list where to put data onto */
-)
-{
-	struct psmqd_tl **tl;       /* list where to put data onto */
-	char              data[4 + PSMQ_PAYLOAD_MAX]; /* topic and data buffer */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	(void)prio;
-	tl = arg;
-
-	/* control message received, either got -d (disabled) or
-	 * -c (close). Either way, no more reading */
-	if (topic[0] == '-')
-		return -1;
-
-	strcpy(data, topic);
-	data[strlen(topic)] = ' ';
-	data[strlen(topic) + 1] = '\0';
-	memcpy(data + strlen(topic) + 1, payload, paylen);
-	data[sizeof(data) - 1] = '\0';
-
-	if (psmqd_tl_add(tl, data) != 0)
-		return -1;
-
-	return 0;
-}
-
-
-/* ==========================================================================
     This threads reads data from passed psmq client and puts received data
-    into passed list until either -d or -c comes from the broker.
+    into passed list until broker closes connection.
    ========================================================================== */
 
 
@@ -133,10 +97,29 @@ static void *multi_sub_thread
 
 	args = arg;
 
-	/* receive data until we receive 'disable' message */
-	while (psmq_receive(args->psmq, multi_sub_clbk, args->tl) == 0) {}
+	for (;;)
+	{
+		struct psmqd_tl **tl;       /* list where to put data onto */
+		struct psmq_msg   msg;
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-	return NULL;
+		tl = args->tl;
+
+		if (psmq_receive(args->psmq, &msg, NULL) == -1)
+			return NULL;
+
+		/* we are being told to stop, so stop */
+		if (strcmp(msg.data, "/s") == 0)
+			return NULL;
+
+		/* transform "topic\0payload" into
+		 * topic payload" format */
+		msg.data[strlen(msg.data)] = ' ';
+
+		/* add data to a list */
+		if (psmqd_tl_add(tl, msg.data) != 0)
+			return NULL;
+	}
 }
 
 
@@ -159,7 +142,7 @@ static void *multi_pub_thread
 
 	for (; args->num_msg >= 0; --args->num_msg)
 	{
-		char    data[3 + PSMQ_PAYLOAD_MAX];
+		char    data[PSMQ_MSG_MAX];
 		size_t  paylen;
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -167,7 +150,7 @@ static void *multi_pub_thread
 		data[0] = '/';
 		data[1] = '1' + args->id;
 		data[2] = '\0';
-		paylen = rand() % (PSMQ_PAYLOAD_MAX + 1);
+		paylen = rand() % (PSMQ_MSG_MAX - 3 + 1);
 
 		data[3] = '\0';
 		psmqt_gen_random_string(data + 3, paylen);
@@ -200,7 +183,6 @@ static void psmqd_wildard_test
 {
 	struct psmq              *sub_psmq;
 	struct psmq               pub_psmq;
-	struct psmq_msg           msg;
 	char                    (*sub_qname)[QNAME_LEN];
 	char                     *pub_qname;
 	size_t                    i;
@@ -217,7 +199,8 @@ static void psmqd_wildard_test
 	{
 		mt_fok(psmq_init(&sub_psmq[i], gt_broker_name, sub_qname[i], 4));
 		mt_fok(psmq_subscribe(&sub_psmq[i], sub_topics[i]));
-		mt_fok(psmq_enable(&sub_psmq[i], 1));
+		mt_fok(psmqt_receive_expect(&sub_psmq[i], 's', 0, 0,
+					sub_topics[i], NULL));
 	}
 
 	for (i = 0; i != matches_num; ++i)
@@ -229,22 +212,19 @@ static void psmqd_wildard_test
 
 		mt_fok(psmq_publish(&pub_psmq, matches[i].topic, NULL, 0, 0));
 
+		/* receive messages on expected client and
+		 * check if received message is really what was expected */
 		for (j = 0; (match = matches[i].matches[j]) != UCHAR_MAX ;++j)
-		{
-			/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-			/* receive messages on expected client */
-			mt_fok(psmq_receive(&sub_psmq[match], psmqt_msg_receiver, &msg));
-
-			/* check if received messages is really what was expected */
-			mt_fail(msg.paylen == 0);
-			mt_fail(strcmp(msg.topic, matches[i].topic) == 0);
-		}
+			mt_fok(psmqt_receive_expect(&sub_psmq[match], 'p', 0, 0,
+						matches[i].topic, NULL));
 	}
 
 	for (i = 0; i != sub_topics_num; ++i)
 	{
+		struct psmq_msg  msg;
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
 		/* make non blocking read on all subscribe clients, they
 		 * should all fail, as we read all messages in previous
 		 * loop. If any of the client no returns message, that
@@ -258,11 +238,9 @@ static void psmqd_wildard_test
 		 * Don't ask me why, but in this case qnx will return ETIMEDOUT.
 		 * I am not even trying to guess what the fuck is going on in
 		 * this system */
-		mt_ferr(psmq_timedreceive_ms(&sub_psmq[i], psmqt_msg_receiver, &msg, 0),
-				ETIMEDOUT);
+		mt_ferr(psmq_timedreceive_ms(&sub_psmq[i], &msg, NULL, 0), EINTR);
 #else
-		mt_ferr(psmq_timedreceive_ms(&sub_psmq[i], psmqt_msg_receiver, &msg, 0),
-				ETIMEDOUT);
+		mt_ferr(psmq_timedreceive_ms(&sub_psmq[i], &msg, NULL, 0), ETIMEDOUT);
 #endif
 
 		/* by the way, cleanup clients as we are done */
@@ -410,15 +388,8 @@ static void psmqd_create_too_much_client(void)
 
 static void psmqd_send_empty_msg(void)
 {
-	struct psmq_msg  msg;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
 	mt_fok(psmq_publish(&gt_pub_psmq, "/t", NULL, 0, 0));
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-
-	mt_fail(strcmp(msg.topic, "/t") == 0);
-	mt_fail(msg.paylen == 0);
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, 0, "/t", NULL));
 }
 
 
@@ -428,16 +399,8 @@ static void psmqd_send_empty_msg(void)
 
 static void psmqd_send_msg(void)
 {
-	struct psmq_msg  msg;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
 	mt_fok(psmq_publish(&gt_pub_psmq, "/t", "t", 2, 0));
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-
-	mt_fail(strcmp(msg.topic, "/t") == 0);
-	mt_fail(memcmp(msg.payload, "t", 2) == 0);
-	mt_fail(msg.paylen == 2);
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, 2, "/t", "t"));
 }
 
 
@@ -447,8 +410,7 @@ static void psmqd_send_msg(void)
 
 static void psmqd_send_full_msg(void)
 {
-	struct psmq_msg  msg;
-	char             buf[PSMQ_PAYLOAD_MAX];
+	char             buf[PSMQ_MSG_MAX - 3];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -456,11 +418,7 @@ static void psmqd_send_full_msg(void)
 	buf[0] = '\0';
 
 	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-
-	mt_fail(strcmp(msg.topic, "/t") == 0);
-	mt_fail(memcmp(msg.payload, buf, sizeof(buf)) == 0);
-	mt_fail(msg.paylen == sizeof(buf));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf), "/t", buf));
 }
 
 
@@ -470,10 +428,10 @@ static void psmqd_send_full_msg(void)
 
 static void psmqd_send_too_big_msg(void)
 {
-	struct psmq_msg      msg;
-	struct psmq_msg      msge;
-	struct psmq_msg_pub  pub;
-	char                 buf[PSMQ_PAYLOAD_MAX + 10];
+	struct psmq_msg  msg;
+	struct psmq_msg  msge;
+	struct psmq_msg  pub;
+	char             buf[PSMQ_MSG_MAX + 10];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -484,19 +442,17 @@ static void psmqd_send_too_big_msg(void)
 
 	mt_ferr(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0), ENOBUFS);
 
-	pub.topic[0] = '/';
-	pub.topic[1] = 't';
-	pub.paylen = PSMQ_PAYLOAD_MAX + 20;
+	pub.data[0] = '/';
+	pub.data[1] = 't';
+	pub.paylen = PSMQ_MSG_MAX + 20;
 	mq_send(gt_pub_psmq.qpub, (const char *)&pub, sizeof(pub), 0);
 
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
 #endif
 	mt_fail(memcmp(&msg, &msge, sizeof(msg)) == 0);
 }
@@ -512,15 +468,17 @@ static void psmqd_send_unknown_control_msg(void)
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	mt_fok(psmq_publish(&gt_pub_psmq, "-X", NULL, 0, 0));
+	msg.ctrl.cmd = 'x';
+	msg.ctrl.data = gt_pub_psmq.fd;
+	msg.paylen = 0;
+	msg.data[0] = 0;
+	mt_fok(psmq_publish_msg(&gt_pub_psmq, 'x', 0, NULL, NULL, 0, 0));
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
 #endif
 }
 
@@ -531,8 +489,8 @@ static void psmqd_send_unknown_control_msg(void)
 
 static void psmqd_send_msg_when_noone_is_listening(void)
 {
+	char             buf[PSMQ_MSG_MAX - 3];
 	struct psmq_msg  msg;
-	char             buf[PSMQ_PAYLOAD_MAX];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -544,11 +502,9 @@ static void psmqd_send_msg_when_noone_is_listening(void)
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs
 	 */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
 #endif
 }
 
@@ -561,19 +517,18 @@ static void psmqd_subscribe_with_bad_topics(void)
 {
 	int              i;
 	char             qname[QNAME_LEN];
-	char             topic[6+1];
 	struct psmq      psmq;
 	struct psmq_msg  msg;
 	const char      *topics[] = { "", "/", "a", "a/", "//", "-d"
-#if PSMQ_TOPIC_MAX > 2
+#if PSMQ_MSG_MAX > 3
 		, "/a/"
 #endif
 
-#if PSMQ_TOPIC_MAX > 3
+#if PSMQ_MSG_MAX > 4
 		, "/a//"
 #endif
 
-#if PSMQ_TOPIC_MAX > 4
+#if PSMQ_MSG_MAX > 5
 		, "/a//a"
 #endif
 	};
@@ -582,32 +537,15 @@ static void psmqd_subscribe_with_bad_topics(void)
 
 	psmqt_gen_queue_name(qname, sizeof(qname));
 	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
-	psmq.enabled = 1;
-	sprintf(topic, "-s/%d", psmq.fd);
 
 	memset(&msg, 0x00, sizeof(msg));
 
 	for (i = 0; i != sizeof(topics)/sizeof(*topics); ++i)
 	{
-		mt_fok(psmq_publish(&psmq, topic, topics[i], strlen(topics[i]) + 1, 0));
-		mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-		mt_fail(*(unsigned char *)msg.payload == (unsigned char)EBADMSG);
-		mt_fail(msg.paylen == 1);
+		mt_fok(psmq_publish_msg(&psmq, 's', psmq.fd, topics[i], NULL, 0, 0));
+		mt_fok(psmqt_receive_expect(&psmq, 's', (unsigned char)EBADMSG,
+					0, topics[i], NULL));
 	}
-
-#if PSMQ_TOPIC_MAX > 2
-	mt_fok(psmq_publish(&psmq, topic, "/t1", 3, 0));
-	mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-	mt_fail(*(unsigned char *)msg.payload == (unsigned char)EBADMSG);
-	mt_fail(msg.paylen == 1);
-#endif
-
-#if PSMQ_TOPIC_MAX > 3
-	mt_fok(psmq_publish(&psmq, topic, "/t\0", 4, 0));
-	mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-	mt_fail(*(unsigned char *)msg.payload == (unsigned char)EBADMSG);
-	mt_fail(msg.paylen == 1);
-#endif
 
 	mt_fok(psmq_cleanup(&psmq));
 	mq_unlink(qname);
@@ -621,34 +559,26 @@ static void psmqd_subscribe_with_bad_topics(void)
 
 static void psmqd_unsubscribe(void)
 {
+	char             buf[PSMQ_MSG_MAX - 3];
 	struct psmq_msg  msg;
-	char             buf[PSMQ_PAYLOAD_MAX];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
 	psmqt_gen_random_string(buf, sizeof(buf));
 
 	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-
-	mt_fail(strcmp(msg.topic, "/t") == 0);
-	mt_fail(memcmp(msg.payload, buf, sizeof(buf)) == 0);
-
-	mt_fail(msg.paylen == sizeof(buf));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf), "/t", buf));
 
 	mt_fok(psmq_unsubscribe(&gt_sub_psmq, "/t"));
-	mt_fok(psmq_receive(&gt_sub_psmq, psmqt_msg_receiver, &msg));
-	mt_fail(msg.paylen == 1);
-	mt_fail(*(unsigned char *)msg.payload == 0);
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'u', 0, 0, "/t", NULL));
+
 	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, psmqt_msg_receiver, &msg, 100),
-			ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
 #endif
 }
 
@@ -659,9 +589,7 @@ static void psmqd_unsubscribe(void)
 
 static void psmqd_unsubscribe_with_bad_topics(void)
 {
-	char             buf[PSMQ_PAYLOAD_MAX];
 	char             qname[QNAME_LEN];
-	char             topic[6 + 1];
 	struct psmq      psmq;
 	struct psmq_msg  msg;
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -670,38 +598,15 @@ static void psmqd_unsubscribe_with_bad_topics(void)
 	psmqt_gen_queue_name(qname, sizeof(qname));
 	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
 	mt_fok(psmq_subscribe(&psmq, "/t"));
-	psmq.enabled = 1;
-	sprintf(topic, "-u/%d", psmq.fd);
+	mt_fok(psmqt_receive_expect(&psmq, 's', 0, 0, "/t", NULL));
 
 	memset(&msg, 0x00, sizeof(msg));
 
-	errno = 0;
-	psmqt_gen_random_string(buf, sizeof(buf));
-	mt_fok(psmq_publish(&psmq, topic, buf, sizeof(buf), 0));
-	mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-	mt_fail(msg.paylen == 1);
-	mt_fail(*(unsigned char *)msg.payload == (unsigned char)ENOENT);
-
-	buf[sizeof(buf) - 1] = 'a';
-	mt_fok(psmq_publish(&psmq, topic, buf, sizeof(buf), 0));
-	mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-	mt_fail(msg.paylen == 1);
-	mt_fail(*(unsigned char *)msg.payload == (unsigned char)ENOENT);
-
-	mt_fok(psmq_publish(&psmq, topic, NULL, 0, 0));
-	mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-	mt_fail(msg.paylen == 1);
-	mt_fail(*(unsigned char *)msg.payload == (unsigned char)ENOENT);
-
-	mt_fok(psmq_publish(&psmq, topic, NULL, 2, 0));
-	mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-	mt_fail(msg.paylen == 1);
-	mt_fail(*(unsigned char *)msg.payload == (unsigned char)ENOENT);
-
-	mt_fok(psmq_publish(&psmq, topic, "", 1, 0));
-	mt_fok(psmq_receive(&psmq, psmqt_msg_receiver, &msg));
-	mt_fail(msg.paylen == 1);
-	mt_fail(*(unsigned char *)msg.payload == (unsigned char)ENOENT);
+	mt_ferr(psmq_unsubscribe(&psmq, "a"), EBADMSG);
+	mt_ferr(psmq_unsubscribe(&psmq, NULL), EINVAL);
+	mt_ferr(psmq_unsubscribe(&psmq, ""), EINVAL);
+	mt_fok(psmq_unsubscribe(&psmq, "/a/"));
+	mt_fok(psmqt_receive_expect(&psmq, 'u', ENOENT, 0, "/a/", NULL));
 
 	mt_fok(psmq_cleanup(&psmq));
 	mq_unlink(qname);
@@ -725,7 +630,6 @@ static void psmqd_send_msg_with_bad_fd(void)
 
 	psmqt_gen_queue_name(qname, sizeof(qname));
 	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
-	psmq.enabled = 1;
 
 
 	memset(&msg, 0x00, sizeof(msg));
@@ -733,28 +637,17 @@ static void psmqd_send_msg_with_bad_fd(void)
 
 	while ((t = *topics++))
 	{
-		int  i;
-		char topic[6 + 1];
-		const char *fds[] = { "/-1", "/255", "/d1", "/d", "/1d", "/",
-			"", "20", " 0" };
-		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-		for (i = 0; i != sizeof(fds)/sizeof(*fds); ++i)
-		{
-			sprintf(topic, "-%c%s", t, fds[i]);
-			mt_fok(psmq_publish(&psmq, topic, NULL, 0, 0));
-		}
+		mt_fok(psmq_publish_msg(&psmq, t, PSMQ_MAX_CLIENTS, NULL, NULL, 0, 0));
+		mt_fok(psmq_publish_msg(&psmq, t, PSMQ_MAX_CLIENTS+1, NULL, NULL, 0, 0));
+		mt_fok(psmq_publish_msg(&psmq, t, UCHAR_MAX, NULL, NULL, 0, 0));
 	}
 
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&psmq, psmqt_msg_receiver, &msg, 100),
-			EINTR);
+	mt_ferr(psmq_timedreceive_ms(&psmq, &msg, NULL, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&psmq, psmqt_msg_receiver, &msg, 100),
-			ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&psmq, &msg, NULL, 100), ETIMEDOUT);
 #endif
 	mt_fail(memcmp(&msg, &msge, sizeof(msg)) == 0);
 	mt_fok(psmq_cleanup(&psmq));
@@ -803,6 +696,9 @@ static void psmqd_multi_pub_sub(void *arg)
 		qsub[i] = malloc(sizeof(char) * QNAME_LEN);
 		psmqt_gen_queue_name(qsub[i], QNAME_LEN);
 		mt_fok(psmq_init(&psmq_sub[i], gt_broker_name, qsub[i], 10));
+		/* subscribe to "/s" topic, this is "stop" message to
+		 * thread so it knows when to exit */
+		mt_fok(psmq_subscribe(&psmq_sub[i], "/s"));
 	}
 
 	/* clients created, now subscribe all sub clients
@@ -863,9 +759,6 @@ static void psmqd_multi_pub_sub(void *arg)
 	sub_targs = calloc(args->num_sub, sizeof(*sub_targs));
 	for (i = 0; i != args->num_sub; ++i)
 	{
-		/* subscribers need to be enabled too, or they won't
-		 * receive any data.  */
-		mt_fok(psmq_enable(&psmq_sub[i], 1));
 		sub_targs[i].tl = &sub_tl[i];
 		sub_targs[i].psmq = &psmq_sub[i];
 		pthread_create(&sub_t[i], NULL, multi_sub_thread, &sub_targs[i]);
@@ -888,12 +781,9 @@ static void psmqd_multi_pub_sub(void *arg)
 	for (i = 0; i != args->num_pub; ++i)
 		pthread_join(pub_t[i], NULL);
 
-	/* now send disable to the broker, to make subscribers
-	 * stop receiving data - broker will send '-d' message
-	 * to them, and subscriber threads are configured to stop
-	 * whenever this happens */
+	/* tell subscribers to stop receiving and exit */
 	for (i = 0; i != args->num_sub; ++i)
-		psmq_disable_threaded(&psmq_sub[i]);
+		psmq_publish(&psmq_sub[i], "/s", NULL, 0, 0);
 
 	/* wait for all subscribers to finish
 	 * receiving data and exit */
@@ -975,14 +865,14 @@ static void psmqd_topic_plus_wildcard(void)
 	{
 		"/+"       /*  0 */
 
-#if PSMQ_TOPIC_MAX >= 4 && PSMQ_MAX_CLIENTS >= 5
+#if PSMQ_MSG_MAX >= 5 && PSMQ_MAX_CLIENTS >= 5
 			,
 		"/a/+",    /*  1 */
 		"/+/b",    /*  2 */
 		"/+/+"     /*  3 */
 #endif
 
-#if PSMQ_TOPIC_MAX >= 6 && PSMQ_MAX_CLIENTS >= 12
+#if PSMQ_MSG_MAX >= 7 && PSMQ_MAX_CLIENTS >= 12
 			,
 		"/a/b/+",  /*  4 */
 		"/a/+/c",  /*  5 */
@@ -1000,7 +890,7 @@ static void psmqd_topic_plus_wildcard(void)
 		{ "/b",     { 0, UCHAR_MAX } },
 		{ "/c",     { 0, UCHAR_MAX } }
 
-#if PSMQ_TOPIC_MAX >= 4 && PSMQ_MAX_CLIENTS >= 5
+#if PSMQ_MSG_MAX >= 5 && PSMQ_MAX_CLIENTS >= 5
 		,
 		{ "/aab",   { 0, UCHAR_MAX } },
 		{ "/a/a",   { 1, 3, UCHAR_MAX } },
@@ -1014,7 +904,7 @@ static void psmqd_topic_plus_wildcard(void)
 		{ "/c/c",   { 3, UCHAR_MAX } }
 #endif
 
-#if PSMQ_TOPIC_MAX >= 6 && PSMQ_MAX_CLIENTS >= 12
+#if PSMQ_MSG_MAX >= 7 && PSMQ_MAX_CLIENTS >= 12
 		,
 		{ "/a/bbb", { 1, 3, UCHAR_MAX } },
 		{ "/aa/b",  { 2, 3, UCHAR_MAX } },
@@ -1066,12 +956,12 @@ static void psmqd_topic_star_wildcard(void)
 	{
 		"/*"       /*  0 */
 
-#if PSMQ_TOPIC_MAX >= 4 && PSMQ_MAX_CLIENTS >= 3
+#if PSMQ_MSG_MAX >= 5 && PSMQ_MAX_CLIENTS >= 3
 		,
 		"/a/*"     /*  1 */
 #endif
 
-#if PSMQ_TOPIC_MAX >= 6 && PSMQ_MAX_CLIENTS >= 4
+#if PSMQ_MSG_MAX >= 7 && PSMQ_MAX_CLIENTS >= 4
 		,
 		"/a/b/*"   /*  2 */
 
@@ -1084,7 +974,7 @@ static void psmqd_topic_star_wildcard(void)
 		{ "/b",     { 0, UCHAR_MAX } },
 		{ "/c",     { 0, UCHAR_MAX } }
 
-#if PSMQ_TOPIC_MAX >= 4 && PSMQ_MAX_CLIENTS >= 3
+#if PSMQ_MSG_MAX >= 5 && PSMQ_MAX_CLIENTS >= 3
 		,
 		{ "/aab",   { 0, UCHAR_MAX } },
 		{ "/a/a",   { 0, 1, UCHAR_MAX } },
@@ -1098,7 +988,7 @@ static void psmqd_topic_star_wildcard(void)
 		{ "/c/c",   { 0, UCHAR_MAX } }
 #endif
 
-#if PSMQ_TOPIC_MAX >= 6 && PSMQ_MAX_CLIENTS >= 4
+#if PSMQ_MSG_MAX >= 7 && PSMQ_MAX_CLIENTS >= 4
 		,
 		{ "/a/bbb", { 0, 1, UCHAR_MAX } },
 		{ "/aa/b",  { 0, UCHAR_MAX } },
@@ -1148,11 +1038,11 @@ static void psmqd_topic_mixed_wildcard(void)
 {
 	const char *sub_topics[] =
 	{
-#if PSMQ_TOPIC_MAX >= 4 && PSMQ_MAX_CLIENTS >= 2
+#if PSMQ_MSG_MAX >= 5 && PSMQ_MAX_CLIENTS >= 2
 		"/+/*"     /* 0 */
 #endif
 
-#if PSMQ_TOPIC_MAX >= 6 && PSMQ_MAX_CLIENTS >= 5
+#if PSMQ_MSG_MAX >= 7 && PSMQ_MAX_CLIENTS >= 5
 		,
 		"/a/+/*",  /* 1 */
 		"/+/b/*",  /* 2 */
@@ -1166,7 +1056,7 @@ static void psmqd_topic_mixed_wildcard(void)
 		{ "/b",     { UCHAR_MAX } },
 		{ "/c",     { UCHAR_MAX } }
 
-#if PSMQ_TOPIC_MAX >= 4 && PSMQ_MAX_CLIENTS >= 2
+#if PSMQ_MSG_MAX >= 5 && PSMQ_MAX_CLIENTS >= 2
 		,
 		{ "/aab",   { UCHAR_MAX } },
 		{ "/a/a",   { 0, UCHAR_MAX } },
@@ -1180,7 +1070,7 @@ static void psmqd_topic_mixed_wildcard(void)
 		{ "/c/c",   { 0, UCHAR_MAX } }
 #endif
 
-#if PSMQ_TOPIC_MAX >= 6 && PSMQ_MAX_CLIENTS >= 5
+#if PSMQ_MSG_MAX >= 7 && PSMQ_MAX_CLIENTS >= 5
 		,
 		{ "/a/bbb", { 0, UCHAR_MAX } },
 		{ "/aa/b",  { 0, UCHAR_MAX } },
@@ -1214,7 +1104,7 @@ static void psmqd_topic_mixed_wildcard(void)
 		{ "/c/c/c", { 0, 3, UCHAR_MAX } }
 #endif
 
-#if PSMQ_TOPIC_MAX >= 8 && PSMQ_MAX_CLIENTS >= 5
+#if PSMQ_MSG_MAX >= 9 && PSMQ_MAX_CLIENTS >= 5
 		,
 		{ "/a/bbb",   { 0, UCHAR_MAX } },
 		{ "/aa/b",    { 0, UCHAR_MAX } },
@@ -1273,7 +1163,7 @@ static void psmqd_reply_to_full_queue(void)
 	mt_fail(psmq_init(&pub_psmq, gt_broker_name, qname[0], 10) == 0);
 	mt_fail(psmq_init(&sub_psmq, gt_broker_name, qname[1], 2) == 0);
 	mt_fok(psmq_subscribe(&sub_psmq, "/t"));
-	mt_fok(psmq_enable(&sub_psmq, 1));
+	mt_fok(psmqt_receive_expect(&sub_psmq, 's', 0, 0, "/t", NULL));
 	mt_fok(psmq_publish(&pub_psmq, "/t", "1", 2, 0));
 	mt_fok(psmq_publish(&pub_psmq, "/t", "2", 2, 0));
 	mt_fok(psmq_publish(&pub_psmq, "/t", "3", 2, 0));
@@ -1283,16 +1173,14 @@ static void psmqd_reply_to_full_queue(void)
 	tp.tv_sec = 1;
 	tp.tv_nsec = 0;
 	nanosleep(&tp, NULL);
-	mt_fok(psmq_receive(&sub_psmq, psmqt_msg_receiver, &msg));
-	mt_fok(psmq_receive(&sub_psmq, psmqt_msg_receiver, &msg));
+	mt_fok(psmq_receive(&sub_psmq, &msg, NULL));
+	mt_fok(psmq_receive(&sub_psmq, &msg, NULL));
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&sub_psmq, psmqt_msg_receiver, &msg, 100),
-			EINTR);
+	mt_ferr(psmq_timedreceive_ms(&sub_psmq, &msg, NULL, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&sub_psmq, psmqt_msg_receiver, &msg, 100),
-			ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&sub_psmq, &msg, NULL, 100), ETIMEDOUT);
 #endif
 
 	mt_fok(psmq_cleanup(&pub_psmq));

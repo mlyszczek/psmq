@@ -68,6 +68,7 @@ struct psmq  gt_pub_psmq;               /* pub psmq for tests */
 struct psmq  gt_sub_psmq;               /* sub psmq for tests */
 char         gt_pub_name[QNAME_LEN];    /* pub queue name for tests */
 char         gt_sub_name[QNAME_LEN];    /* sub queue name for tests */
+struct psmq_msg gt_recvd_msg;           /* received message */
 
 
 /* ==========================================================================
@@ -314,34 +315,6 @@ void psmqt_gen_unique_queue_name_array
 
 
 /* ==========================================================================
-    Receives data from broker and packs them into psmq_msg struct passed in
-    arg.
-   ========================================================================== */
-
-
-int psmqt_msg_receiver
-(
-	char             *topic,         /* topic of data received from broker */
-	void             *payload,       /* data received from broker */
-	size_t            paylen,        /* size of the payload */
-	unsigned int      prio,          /* received message priority */
-	void             *arg            /* list where to put data onto */
-)
-{
-	struct psmq_msg  *msg;
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-	(void)prio;
-
-	msg = arg;
-	strcpy(msg->topic, topic);
-	memcpy(msg->payload, payload, paylen);
-	msg->paylen = paylen;
-	return 0;
-}
-
-
-/* ==========================================================================
    ========================================================================== */
 
 
@@ -375,7 +348,7 @@ void psmqt_prepare_test_with_clients(void)
 	mt_fok(psmq_init(&gt_pub_psmq, gt_broker_name, gt_pub_name, 10));
 	mt_fok(psmq_init(&gt_sub_psmq, gt_broker_name, gt_sub_name, 10));
 	mt_fok(psmq_subscribe(&gt_sub_psmq, "/t"));
-	mt_fok(psmq_enable(&gt_sub_psmq, 1));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 's', 0, 0, "/t", NULL));
 }
 
 
@@ -418,3 +391,40 @@ void psmqt_cleanup_test_with_clients(void)
 	mq_unlink(gt_pub_name);
 	mq_unlink(gt_sub_name);
 }
+
+
+/* ==========================================================================
+   ========================================================================== */
+
+
+int psmqt_receive_expect
+(
+	struct psmq     *psmq,
+	char             cmd,
+	unsigned char    data,
+	unsigned short   paylen,
+	const char      *topic,
+	void            *payload
+)
+{
+	int              e;
+	struct psmq_msg  msg;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+	if (psmq_receive(psmq, &msg, NULL) == -1)
+		return -1;
+
+	e = 0;
+
+	e |= msg.ctrl.cmd != cmd;
+	e |= msg.ctrl.data != data;
+	e |= msg.paylen != paylen;
+	e |= strcmp(msg.data, topic);
+	if (paylen == 0 && strlen(msg.data) == 0)
+		e |= msg.data[0] != '\0';
+	if (msg.paylen && paylen && payload)
+		e |= memcmp(msg.data + strlen(msg.data) + 1, payload, msg.paylen);
+
+	return e;
+}
+
