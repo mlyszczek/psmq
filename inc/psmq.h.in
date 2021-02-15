@@ -12,8 +12,6 @@
 #define PSMQ_CTRL_CMD_CLOSE       'c'
 #define PSMQ_CTRL_CMD_SUBSCRIBE   's'
 #define PSMQ_CTRL_CMD_UNSUBSCRIBE 'u'
-#define PSMQ_CTRL_CMD_ENABLE      'e'
-#define PSMQ_CTRL_CMD_DISABLE     'd'
 #define PSMQ_CTRL_CMD_PUBLISH     'p'
 
 
