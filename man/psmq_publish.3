@@ -46,6 +46,19 @@ When publishing you need to publish to very specific topic (like
 wildcards in
 .I topic
 (like "/can/engine/+").
+.PP
+When sending message, both
+.I topic
+and
+.I payload
+share single buffer of size
+.BR PSMQ_MSG_MAX .
+This means topic size + payload size cannot exceed that value.
+Note, that topic will take strlen(topic) + 1 size on buffer, since
+topic is string so it will also transmit null terminator char.
+This allows for some flexibility, as one message can contain large
+(as in PSMQ_MSG_MAX - 1 large) and no payload, and next publish can
+be opposite - short topic but large payload.
 .SH "RETURN VALUE"
 .PP
 0 on success. -1 on errors with appropriate errno set.
@@ -64,7 +77,7 @@ has not yet been initialized
 .TP
 .B ENOBUFS
 .I topic
-or
+and/or
 .I payload
 are too big to fit into message buffer.
 .TP
@@ -87,23 +100,17 @@ Error checking ommited for better readability.
 
         /* initialize psmq object that will create /sub mqueue for
          * receiving data, and will connect to broker of name /brok.
-         * Max items in queue is set to 10
-         */
+         * Max items in queue is set to 10 */
         psmq_init(&psmq, "/brok", "/sub", 10);
 
         /* if we don't want to receive any message, we can skip
-         * susbscribe and enable functions.
-         *
-         * Now simply send message to broker
-         */
-
+         * susbscribe function. */
+        /* Now simply send message to broker */
         rpm = 1;
         psmq_publish(&psmq, "/can/engine/rpm", &rpm, sizeof(rpm), 0);
 
         /* after work is finished, we need to deregister from broker to
-         * make space in broker for another client
-         */
-
+         * make space in broker for another client */
         psmq_cleanup(&psmq);
         return 0;
     }
@@ -117,8 +124,6 @@ Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
 .BR psmq-pub (1),
 .BR psmq-sub (1),
 .BR psmq_cleanup (3),
-.BR psmq_disable_threaded (3),
-.BR psmq_enable (3),
 .BR psmq_init (3),
 .BR psmq_publish (3),
 .BR psmq_receive (3),

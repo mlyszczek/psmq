@@ -41,7 +41,7 @@ Settings are passed to
 script as environment variables like that
 .PP
 .nf
-    PSMQ_MAX_CLIENTS=128 PSMQ_TOPIC_MAX=32 PSMQ_PAYLOAD_MAX=64 ./configure
+    PSMQ_MAX_CLIENTS=128 PSMQ_MSG_MAX=64 ./configure
 .fi
 .PP
 And of course after that, there is standard "make" and "make install".
@@ -55,7 +55,7 @@ How you do it heavily depends on your build system.
 For cmake, you could use
 .PP
 .nf
-    add_definitions(-DPSMQ_MAX_CLIENTS=128 -DPSMQ_TOPIC_MAX=32)
+    add_definitions(-DPSMQ_MAX_CLIENTS=128 -DPSMQ_MSG_MAX=32)
 .fi
 .PP
 If you are using "make" based build system, you would use something along the
@@ -63,8 +63,7 @@ lines
 .PP
 .nf
     CFLAGS += -DPSMQ_MAX_CLIENTS=128
-    CFLAGS += -DPSMQ_PAYLOAD_MAX=64
-    CFLAGS += -DPSMQ_TOPIC_MAX=32
+    CFLAGS += -DPSMQ_MSG_MAX=64
 .fi
 .SS "CONFIG FILE"
 .PP
@@ -88,8 +87,7 @@ definitions
 .PP
 .nf
     #define PSMQ_MAX_CLIENTS 128
-    #define PSMQ_PAYLOAD_MAX 64
-    #define PSMQ_TOPIC_MAX 32
+    #define PSMQ_MSG_MAX 64
 .fi
 .SH "COMPILATION OPTIONS"
 .TP
@@ -101,40 +99,20 @@ already max clients connected.
 will alocate client array with static storage duration that is about 12 bytes
 (may vary depending on architecture) for each client.
 .TP
-.BR PSMQ_TOPIC_MAX\  (int)
-Defines maximum length any topic can be.
-That includes first \'/\' character, but does not include terminating null
-character.
-So if this is set to 3, then topics "/0", "/01" will be valid, but "/012" will
-be too long.
-To avoid unnecessary padding, set this value to round value minus one, that is
-15 instead of 16, or 127 instead of 128.
-It's because
-.B psmq
-adds +1 for string termination character, so if you set this to 16, array size
-will be effectively 17 and that may lead to padding.
-.TP
-.BR PSMQ_PAYLOAD_MAX\  (int)
-Defines maximum size of payload that can be sent via
+.BR PSMQ_MSG_MAX\  (int)
+Defines maximum size of topic + payload that can be sent via
 .BR psmq .
+Topic and payload are sent in a single buffer, so they share memory.
+This allows for some flexibility, as you can send one message with big
+topic name, but no payload data and another message can have short topic,
+but much more payload.
+This option has direct impact on memory usage of broker and library.
+But even if you set this to high value, only actual payload will be sent.
+So you could set
+.B PSMQ_MSG_MAX
+to 1024 bytes, send message on topic "/t" and one byte of payload, and then
+only 4 bytes and not 1024 will be copied over mqueue.
 .PP
-Both
-.B PSMQ_TOPIC_MAX
-and
-.B PSMQ_PAYLOAD_MAX
-have direct impact on size of internal message structures that are copied each
-time message is sent.
-If you set
-.B PSMQ_PAYLOAD_MAX
-to, let's say 20, and you are sending message with payload that takes only 2
-byte, then 20 bytes will get copied anyway.
-Same rule applies to topics.
-.PP
-Broker will create single mqueue with with mq_size set to
-.B sizeof(struct psmq_msg_pub)
-and each client will create single mqueue with mq size set to
-.BR sizeof(struct psmq_msg) .
-Both of these values are printed during broker startup.
 .TP
 .BR PSMQ_NO_SIGNALS\  (bool)
 Signals were implemented mainly for full-fledged UNIXes, but many embedded
@@ -145,7 +123,7 @@ with autotools. C'mon, if you can use autotools you surely have signals.
 .SH DEPENDENCIES
 .PP
 Broker needs
-.B embedlog
+.B >=embedlog-0.6.0
 for logging.
 It can be downloaded from
 .B https://embedlog.bofc.pl
@@ -155,8 +133,6 @@ It can be downloaded from
 .BR psmq-pub (1),
 .BR psmq-sub (1),
 .BR psmq_cleanup (3),
-.BR psmq_disable_threaded (3),
-.BR psmq_enable (3),
 .BR psmq_init (3),
 .BR psmq_publish (3),
 .BR psmq_receive (3),

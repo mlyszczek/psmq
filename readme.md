@@ -3,7 +3,7 @@
 About
 =====
 
-**psmq** is **p**ublish **s**subscribe **m**essage **q**ueue. It's a set of
+**psmq** is **p**ublish **s**ubscribe **m**essage **q**ueue. It's a set of
 programs and libraries to implement publish/subscribe way of inter process
 communication on top of **POSIX** message queue. This program targets mainly
 small embedded systems, which do not have access to some more sophisticated IPC
@@ -64,7 +64,7 @@ Dependencies
 All code follows **ANSI C** and **POSIX** standard (version 200112).
 External dependencies are:
 
-* [>=embedlog-0.5](https://embedlog.bofc.pl)
+* [>=embedlog-0.6](https://embedlog.bofc.pl)
 
 **psmq-0.1.0** requires
 * [=embedlog-0.4](https://embedlog.bofc.pl)

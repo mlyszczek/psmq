@@ -8,48 +8,97 @@
 .PP
 .BI "#include <psmq.h>"
 .PP
-.BI "int psmq_receive(struct psmq *" psmq ", psmq_sub_clbk " clbk ", \
-void *" userdata ")"
+.BI "int psmq_receive(struct psmq *" psmq ", struct psmq_msg *" msg ", \
+unsigned *" prio ")"
 .br
-.BI "int psmq_timedreceive(struct psmq *" psmq ", psmq_sub_clbk " clbk ", \
-void *" userdata ", struct timespec *" tp ")"
+.BI "int psmq_timedreceive(struct psmq *" psmq ", struct psmq_msg *" msg ", \
+unsigned *" prio ", struct timespec *" tp ")"
 .br
-.BI "int psmq_timedreceive_ms(struct psmq *" psmq ", psmq_sub_clbk " clbk ", \
-void *" userdata ", size_t " ms ")"
-.PP
-.BI "int (*" psmq_sub_clbk ")(char *" topic ", void *" payload ", \
-size_t " paylen ", unsigned int " prio ", void *" userdata ");
+.BI "int psmq_timedreceive_ms(struct psmq *" psmq ", struct psmq_msg *" msg ", \
+unsigned *" prio ", size_t " ms ")"
+.br
+.BI char\ *\ PSMQ_TOPIC(struct\ psmq_msg\  psmq )
+.br
+.BI void\ *\ PSMQ_PAYLOAD(struct\ psmq_msg\  psmq )
 .SH DESCRIPTION
 .PP
-Receive single message that client has subscribed to.
+Receive single control message or message that client has subscribed to.
 Functions will block calling thread until message is received.
+Message will be stored in user provided memory pointed by
+.IR msg .
 .PP
-When message is received, function will call user provided function
-.I clbk
-with
-.I topic
-on which message has been sent,
-.I payload
-with data (which may be
-.B NULL
-if there is no data),
-.I paylen
-which is information about
-.I payload
-size in bytes and
-.I userdata
-pointer to data passed to
-.BR psmq_receive (3)
-which can be used to extrapolate data from message.
-After
-.I clbk
-return, pointers stored in
-.I topic
+Message is stored in
+.B struct psmq_msg
+which definition is:
+.nf
+    struct psmq_msg {
+        struct ctrl {
+.RI "            char  " cmd ;
+.RI "            unsigned char " data ;
+.RI "        } " ctrl ;
+.RI "        unsigned short " paylen ;
+.RI "        char " data [PSMQ_MSG_MAX];
+    }
+.fi
+.PP
+.IR ctrl . cmd
+defines type of received message.
+This can be one of:
+.TP
+.B PSMQ_CTRL_CMD_PUBLISH
+Received message on previously subscribed topics.
+.TP
+.B PSMQ_CTRL_CMD_SUBSCRIBE
+Subscribe confirmation has been received.
+.TP
+.B PSMQ_CTRL_CMD_UNSUBSCRIBE
+Unsubscribe confirmation has been received.
+.TP
+.B PSMQ_CTRL_CMD_CLOSE
+Broker closed connection with the client.
+.PP
+.IR ctrl . data
+is a response status of received message.
+Or simply return code of a previous request.
+0 is set when request was a success or
+.B errno
+when error occured.
+For example, when
+.BR psmq_subscribe (3)
+has been sent, broker will reply with
+.IR ctrl . cmd
+set to
+.B PSMQ_CTRL_CMD_SUBSCRIBE
 and
-.I payload
-will point to undefined location and should not be used, if you need access
-to data outside of callback, copy them to location pointed by
-.IR userdata .
+.IR ctrl . data
+set to 0 when subscribe has been successful or, for example
+.B EBADMSG
+when topic was not correct.
+.PP
+.I data
+contains both topic and payload data.
+Topic and payload can be extracted by using
+.BR PSMQ_TOPIC ()
+and
+.BR PSMQ_PAYLOAD ()
+macros and passing
+.RB struct\  psmq_msg
+as argument.
+.BR PSMQ_TOPIC ()
+will return valid c-string with topic, while
+.BR PSMQ_PAYLOAD ()
+will return pointer where payload starts.
+Accessing pointer returned by
+.BR PSMQ_PAYLOAD ()
+is only valid when
+.I paylen
+is bigger than 0, otherwise you risk getting
+.B SIGSEGV
+from OS.
+.PP
+.I paylen
+Length of payload part in
+.IR data .
 .PP
 .BR psmq_timedreceive (3)
 works same way as
@@ -76,26 +125,16 @@ If
 is set to 0 and message is not on the queue, function will return immediately.
 .SH "RETURN VALUE"
 .PP
-When message is received then function will return whatever your
-.I clbk
-returns.
+When message is received 0 is returned.
 On error -1 with appropriate errno set is returned.
 .SH ERRORS
 .TP
 .B EINVAL
 .I psmq
 or
-.I clbk
+.I msg
 is
 .BR NULL .
-.TP
-.B ENOTCONN
-.B psmq
-is connected to the broker, but receiving of the message has not yet been
-enabled.
-See
-.BR psmq_enable (3)
-for details.
 .TP
 .B EBADF
 Subscribe queue is invalid inside passed
@@ -128,15 +167,6 @@ Note: error checking has been ommited for clarity.
     #include <psmq.h>
     #include <stdio.h>
 
-    /* function that will be called upon message retrieval, here we
-     * just parse rpm value and store it in userdata pointer
-     */
-    static int can_engine_rpm_receiver(char *topic, void *payload,
-        size_t paylen, unsigned int prio, void *userdata)
-    {
-        memcpy(userdata, payload, sizeof(int));
-    }
-
     int main(void)
     {
         struct psmq psmq;
@@ -145,39 +175,23 @@ Note: error checking has been ommited for clarity.
 
         /* initialize psmq object that will create /sub mqueue for
          * receiving data, and will connect to broker of name /brok.
-         * Max items in queue is set to 10
-         */
+         * Max items in queue is set to 10 */
         psmq_init(&psmq, "/brok", "/sub", 10);
 
-        /* subscribe to receive revolution per minute information of
-         * engine
-         */
-        psmq_subscribe(&psmq, "/can/engine/rpm");
+        /* subscribe to receive revolution per minute information */
+        psmq_subscribe(&psmq, "/can/+/rpm");
 
-        /* right now we are registered in broker and we did subscribe
-         * to topic, but we won't receive any messages until we enable
-         * client.  We do that now.
-         *
-         * We can disable client without unsubscribing and
-         * unregistering at anytime by calling the same function with
-         * second argument set to 0
-         */
-        psmq_enable(&psmq, 1);
-
-        for (i = 0; i != 10; ++i)
-        {
-            /* now receive data, this function will call our callback
-             * function with data. In this example we copy data to
-             * our rpm variable and print, but this could be done in
-             * callback function to avoid copying data
-             */
-            psmq_receive(&psmq, can_engine_rpm_receiver, &rpm);
-            printf("rpm %d\en", rpm);
+        for (i = 0; i != 10; ++i) {
+            /* now we are ready to receive data. In this example we
+             * simply print received rpm */
+            struct psmq_msg msg;
+            psmq_receive(&psmq, &msg, NULL);
+            memcpy(&rpm, PSMQ_PAYLOAD(msg), sizeof(rpm));
+            printf("topic: %s; rpm %d\en", PSMQ_TOPIC(msg), rpm);
         }
 
         /* after work is finished, we need to deregister from broker to
-         * make space in broker for another client
-         */
+         * make space in broker for another client */
         psmq_cleanup(&psmq);
         return 0;
     }
@@ -191,8 +205,6 @@ Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
 .BR psmq-pub (1),
 .BR psmq-sub (1),
 .BR psmq_cleanup (3),
-.BR psmq_disable_threaded (3),
-.BR psmq_enable (3),
 .BR psmq_init (3),
 .BR psmq_publish (3),
 .BR psmq_receive (3),

@@ -798,11 +798,9 @@ int psmqd_broker_start(void)
 		 * mq_receive() and that will cause deadlock, since program
 		 * will lock in mq_receive() after signal arrives, so it
 		 * will be locked forever (or until someone sends another
-		 * signal ot some message). To prevent it, we wake up every
+		 * signal or some message). To prevent it, we wake up every
 		 * 5 seconds to force another check of shutdown flag. It's
-		 * a small price to pay for not having deadlocks.
-		 */
-
+		 * a small price to pay for not having deadlocks. */
 		if (mq_timedreceive(qctrl, (char *)&msg, sizeof(msg), &prio, &tp) < 0)
 		{
 			/* if we are interrupted by signal,
@@ -814,8 +812,7 @@ int psmqd_broker_start(void)
 			 * if timeout occured continue to
 			 * check for shutdown flag (check
 			 * comment few lines up to see why
-			 * it's here
-			 */
+			 * it's here */
 			if (errno == EINTR || errno == ETIMEDOUT)
 				continue;
 

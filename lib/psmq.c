@@ -82,6 +82,7 @@ int psmq_publish_msg
 	struct psmq_msg  pub;      /* buffer used to send out data to broker */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+
 	VALID(EINVAL, psmq);
 	VALID(EBADF, psmq->qpub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
@@ -168,8 +169,10 @@ static void psmq_ms_to_tp
 
     errno:
             EINVAL      psmq is invalid (null)
+            EINVAL      topic is invalid (null)
             EBADF       psmq was not properly initialized
-            ENOBUFS     topic or payload is to big to fit into buffers
+            EBADMSG     topic does not start from '/' character
+            ENOBUFS     topic and/or payload are to big to fit into buffers
    ========================================================================== */
 
 
@@ -197,8 +200,12 @@ int psmq_publish
 
 
 /* ==========================================================================
-    Receives message from the broker and stores it in user provided buffer
-    'msg'. Does not call any callbacks.
+    Waits for message to be received from broker. Message is stored in msg
+    buffer provided by caller. Function will receive both subscribed message
+    as well as control messages (like subscribe confirmation). Function waits
+    for message forever or until it is interrupted by signal.
+
+    Returns 0 on success or -1 on errors
 
     errno:
             EINVAL      psmq is invalid (null)
@@ -227,20 +234,24 @@ int psmq_receive
 
 
 /* ==========================================================================
-    Receives message from the broker and stores it in user provided buffer
-    'msg'. Does not call any callbacks.
-
-    Same as psmq_receive_msg(), but block only for ammount of time specified
-    by absolute timespec 'tp', unlike psmq_receive_msg() which will block
-    until message is received (or is interrupted by signal).
+    Same as psmq_receive(), but blocks only for ammount of time specified
+    by absolute timespec 'tp', unlike psmq_receive() which will block until
+    message is received (or is interrupted by signal).
 
     When timeout occurs, msg is not modified.
-    When seconds is 0, function returns immediately.
+    When tp is 0, function returns immediately.
+
+    Returns 0 on success or -1 on errors
 
     errno:
             EINVAL      psmq is invalid (null)
+            EINVAL      msg is invalid (null)
+            EINVAL      tp is invalid (null)
+            EINVAL      tp is invalid (tv_sec less than zero, or
+                        tv_nsec less than zero or grater than 1000 mil)
             EBADF       psmq was not properly initialized
             EINTR       The call was interrupted by a signal handler
+            ETIMEDOUT   call timed out before message could be received
             EAGAIN      The queue was empty, and the O_NONBLOCK flag was set
                         for the message queue
 
@@ -270,17 +281,22 @@ int psmq_timedreceive
 
 
 /* ==========================================================================
-    Same as psmq_timedreceive_msg() but accepts 'milisecond' time that shall
+    Same as psmq_timedreceive() but accepts 'milisecond' time that shall
     pass before timeout should occur instead of absolute timespec.
 
-    When timeout occurs, on_receive_callback() is not called.
-    When seconds is 0, function returns immediately.
+    When timeout occurs, msg is not modified.
+    When ms is 0, function returns immediately.
+
+    Returns 0 on success or -1 on errors
 
     errno:
             EINVAL      psmq is invalid (null)
+            EINVAL      msg is invalid (null)
             EBADF       psmq was not properly initialized
-            ENOTCONN    psmq object is not enabled and cannot receive msgs
-            ETIMEDOUT   timeout occured and message did not arrive
+            EINTR       The call was interrupted by a signal handler
+            ETIMEDOUT   call timed out before message could be received
+            EAGAIN      The queue was empty, and the O_NONBLOCK flag was set
+                        for the message queue
 
     notes:
             On qnx (up until 6.4.0 at least) when timeout occurs,
@@ -315,6 +331,25 @@ int psmq_timedreceive_ms
 
     Return 0 when broker sends back connection confirmation or -1 when error
     occured.
+
+    errno:
+            EINVAL      psmq is invalid (null)
+            EINVAL      brokername is invalid (null)
+            EINVAL      brokername does not start with '/'
+            EINVAL      mqname is invalid (null)
+            EINVAL      mqname does not start with '/'
+            EINVAL      maxmsg is 0 or less
+            ENAMETOOLONG  mqname is bigger than PSMQ_MSG_MAX and thus cannot
+                        be send to broker
+            EACCES      Either brokername or mqname can't be opened due to
+                        permissions
+            EACCES      mqname or brokername contains more than one '/'
+            ENFILE      system-wide limit on opened files has been reached
+            EMFILE      per-process limit on opened files has been reached
+            ENOENT      brokername does not exist
+            ENOENT      mqname or brokername was just "/" and nothing else
+            ENOMEM      not enough memory in the system
+            ENOSPC      not enough space for the creation of a new queue
    ========================================================================== */
 
 
@@ -449,7 +484,15 @@ error:
 
 
 /* ==========================================================================
-    Cleans up whatever has been allocate through the life cycle of 'psmq'
+    Cleans up whatever has been allocate through the life cycle of 'psmq'.
+    Also sends CLOSE command to broker, so it can cleanup and free space for
+    another queue.
+
+    Returns 0 on success or -1 on errors
+
+    errno:
+            EINVAL      psmq is invalid (null)
+            EBADF       psmq has not been initialized
    ========================================================================== */
 
 
@@ -474,11 +517,19 @@ int psmq_cleanup
 
 
 /* ==========================================================================
-    Subscribes to 'psmq' broker on 'topic'. If 'psmq' is not enabled,
-    function will also check for subscribe ack, otherwise caller is
-    responsible for reading it in main application.
+    Subscribes to 'psmq' broker on 'topic'. After this, broker will send
+    back ACK message with information whether subscribtion was success or
+    not. You can check this by calling psmq_receive() after this function.
 
     Returns 0 on success or -1 on error
+
+    errno:
+            EINVAL      psmq is invalid (null)
+            EINVAL      topic is invalid (null)
+            EINVAL      topic is empty ("")
+            EBADMSG     topic contains only "/" and nothing else
+            EBADF       psmq has not been initialized
+            ENOBUFS     topic is too long
    ========================================================================== */
 
 
@@ -503,11 +554,19 @@ int psmq_subscribe
 
 
 /* ==========================================================================
-    Subscribes to 'psmq' broker on 'topic'. If 'psmq' is not enabled,
-    function will also check for subscribe ack, otherwise caller is
-    responsible for reading it in main application.
+    Unsubscribes from 'topic'. After call to this function, broker will send
+    back ACK reply with information whether command was success or not. You
+    can check this by calling psmq_receive() after this.
 
     Returns 0 on success or -1 on error
+
+    errno:
+            EINVAL      psmq is invalid (null)
+            EINVAL      topic is invalid (null)
+            EINVAL      topic is empty ("")
+            EBADMSG     topic contains only "/" and nothing else
+            EBADF       psmq has not been initialized
+            ENOBUFS     topic is too long
    ========================================================================== */
 
 

@@ -117,7 +117,7 @@ match:
 .fi
 .PP
 Note, that above wildcard will not receive sensor if structure differs a bit,
-and sensor value is sent on topic "/can/room//142/kitchen/fridge/temperature".
+and sensor value is sent on topic "/can/room/142/kitchen/fridge/temperature".
 If structure is not regular, you might be better of with another wildcard.
 .PP
 Another type of wildcard is
@@ -193,8 +193,6 @@ l	l.
 \fBpsmq_init\fR(3)	initializes psmq object and connects to the broker
 \fBpsmq_cleanup\fR(3)	cleanup whatever has been allocated by init
 \fBpsmq_publish\fR(3)	publishes message on given topic
-\fBpsmq_enable\fR(3)	tells broker that we are read to receive messages
-\fBpsmq_disable_threaded\fR(3)	same as above but for multithread environment
 \fBpsmq_receive\fR(3)	receive single message from the broker
 \fBpsmq_timedreceive\fR(3)	as above but return after timeout with no message
 \fBpsmq_timedreceive_ms\fR(3)	as above but accepts [ms] instead of timespec
@@ -221,8 +219,6 @@ Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
 .BR psmq-pub (1),
 .BR psmq-sub (1),
 .BR psmq_cleanup (3),
-.BR psmq_disable_threaded (3),
-.BR psmq_enable (3),
 .BR psmq_init (3),
 .BR psmq_publish (3),
 .BR psmq_receive (3),
