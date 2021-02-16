@@ -78,6 +78,10 @@ struct client
 	/* list of topics client is subscribed to, if NULL, client is
 	 * not subscribed to any topic */
 	struct psmqd_tl  *topics;
+
+	/* how many times did client missed pub because it's queue
+	 * was full? */
+	unsigned char  missed_pubs;
 };
 
 
@@ -92,6 +96,7 @@ struct client
 
 
 #define EL_OPTIONS_OBJECT &g_psmqd_log
+#define PSMQ_MAX_MISSED_PUBS 10
 static mqd_t          qctrl;  /* mqueue handle to broker main control queue */
 static struct client  clients[PSMQ_MAX_CLIENTS]; /* array of clients */
 
@@ -279,7 +284,7 @@ static int psmqd_broker_reply_mq
 
 	/* send data to client, but do not wait if its queue
 	 * is full, if it cannot process messages quick enough
-	 * it does not deserver new message */
+	 * it does not deserve new message */
 	tp.tv_sec = 0;
 	tp.tv_nsec = 0;
 	return mq_timedsend(mq, (char *)&msg, psmq_real_msg_size(msg), prio, &tp);
@@ -287,7 +292,9 @@ static int psmqd_broker_reply_mq
 
 
 /* ==========================================================================
-    Same as psmqd_broker_reply_mq() but accepts fd instead of mqueue
+    Same as psmqd_broker_reply_mq() but accepts fd instead of mqueue. Will
+    also increment missed_pubs counter when message could not have been
+    delivered to the client.
    ========================================================================== */
 
 
@@ -302,8 +309,15 @@ static int psmqd_broker_reply
 	unsigned int  prio      /* message priority */
 )
 {
-	return psmqd_broker_reply_mq(clients[fd].mq, cmd,
-			data,topic, payload, paylen, prio);
+	if (psmqd_broker_reply_mq(clients[fd].mq, cmd,
+			data,topic, payload, paylen, prio) == 0)
+	{
+		clients[fd].missed_pubs = 0;
+		return 0;
+	}
+
+	clients[fd].missed_pubs += 1;
+	return -1;
 }
 
 
@@ -577,14 +591,15 @@ static int psmqd_broker_unsubscribe
 
 static int psmqd_broker_close
 (
-	struct psmq_msg  *msg    /* messages request */
+	int  fd  /* client's file descriptor */
 )
 {
-	unsigned char     fd;    /* client's file descriptor */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	fd = msg->ctrl.data;
+	/* first, zero out missed_pubs or else we risk
+	 * infinite recursive loop when sending close
+	 * command to client triggers close function
+	 * over and over again until all that is right
+	 * and good is dead */
+	clients[fd].missed_pubs = 0;
 
 	/* send reply to broker we processed his close
 	 * request, yes we lie to him, but we won't be
@@ -674,6 +689,37 @@ static int psmqd_broker_publish
 				el_operror(OELE, "[%3d] sending failed. topic %s, prio %u,"
 						" payload (len: %u):", fd, topic, prio, msg->paylen);
 				el_opmemory(OELE, payload, msg->paylen);
+
+				if (clients[fd].missed_pubs >= PSMQ_MAX_MISSED_PUBS)
+				{
+					struct psmq_msg  dummy;
+					struct timespec  tp;
+					/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+					el_oprint(OELE, "[%3d] failed to send msg to client "
+							"for %d consecutive calls, delete client",
+							PSMQ_MAX_MISSED_PUBS);
+
+					/* client assumed dead, it's queue now is
+					 * most probably full, but there still is
+					 * a chance that client is alive but just
+					 * hanged for a long time and will eventualy
+					 * read something from queue, but since
+					 * queue is full we cannot send him close
+					 * message. So to make sure there is close
+					 * message on the queue, we remove oldest
+					 * message from it and then call close().
+					 * We do not check for return code here,
+					 * if it does not work there is nothing
+					 * we can do. */
+					tp.tv_sec = 0;
+					tp.tv_nsec = 0;
+					mq_timedreceive(clients[fd].mq, (char *)&dummy,
+							sizeof(dummy), NULL, &tp);
+					psmqd_broker_close(fd);
+					break;
+				}
 				continue;
 			}
 
@@ -865,7 +911,7 @@ int psmqd_broker_start(void)
 		switch (msg.ctrl.cmd)
 		{
 			case 'o': psmqd_broker_open(&msg); break;
-			case 'c': psmqd_broker_close(&msg); break;
+			case 'c': psmqd_broker_close(msg.ctrl.data); break;
 			case 's': psmqd_broker_subscribe(&msg); break;
 			case 'u': psmqd_broker_unsubscribe(&msg); break;
 			case 'p': psmqd_broker_publish(&msg, prio); break;
@@ -891,10 +937,6 @@ int psmqd_broker_cleanup(void)
 	/* close all opened connections */
 	for (fd = 0; fd != PSMQ_MAX_CLIENTS; ++fd)
 	{
-		struct psmq_msg  msg;
-		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
 		/* for empty slots, do nothing */
 		if (clients[fd].mq == (mqd_t)-1)
 			continue;
@@ -903,11 +945,7 @@ int psmqd_broker_cleanup(void)
 		 * this will close connection and free all
 		 * resources, clients will be informed
 		 * about connection close. */
-		msg.paylen = 0;
-		msg.ctrl.cmd = PSMQ_CTRL_CMD_CLOSE;
-		msg.ctrl.data = fd;
-		msg.data[0] = '\0';
-		psmqd_broker_close(&msg);
+		psmqd_broker_close(fd);
 	}
 
 	/* close control mqueue */
