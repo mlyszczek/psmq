@@ -12,7 +12,7 @@
 
 #include <limits.h>
 #include <stddef.h>
-#include <errno.h>
+#include <sys/time.h>
 
 /* hard limits, these are minimal values that either makes sense or
  * psmq cannot properly work with different values that these or
@@ -67,5 +67,7 @@
  * or paylen must be 0 and data[0] = '\0'. */
 #define psmq_real_msg_size(m) (sizeof((m).paylen) + sizeof((m).ctrl) + \
 		strlen((m).data) + 1 + (m).paylen)
+
+void psmq_ms_to_tp(size_t ms, struct timespec *tp);
 
 #endif /* PSMQ_BROKER_H */

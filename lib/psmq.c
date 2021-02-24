@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <mqueue.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -104,49 +105,6 @@ int psmq_publish_msg
 	}
 
 	return mq_send(psmq->qpub, (char *)&pub, psmq_real_msg_size(pub), prio);
-}
-
-
-/* ==========================================================================
-    Converts millisecond into absolute timespec time. If ms is 0, return tp
-    with values set to 0, which is 1970.01.01, when this is passed to
-    mq_timedreceive(), function will timeout immediately
-   ========================================================================== */
-
-
-static void psmq_ms_to_tp
-(
-	size_t            ms,    /* time in milliseconds */
-	struct timespec  *tp     /* ms will be converted to tp here */
-)
-{
-	size_t            nsec;  /* number of nanoseconds to add to timer */
-	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-
-	tp->tv_sec = 0;
-	tp->tv_nsec = 0;
-
-	if (!ms)  return;
-
-	/* milisecond is set, configure tp to wait
-	 * this ammount of time instead of
-	 * returning immediately */
-
-	clock_gettime(CLOCK_REALTIME, tp);
-
-	nsec = ms % 1000;
-	nsec *= 1000000l;
-
-	tp->tv_sec += ms / 1000;
-	tp->tv_nsec += nsec;
-
-	if (tp->tv_nsec >= 1000000000l)
-	{
-		/* overflow on nsec part */
-		tp->tv_nsec -= 1000000000l;
-		tp->tv_sec += 1;
-	}
 }
 
 
@@ -587,4 +545,87 @@ int psmq_unsubscribe
 	/* send subscribe request to the server */
 	return psmq_publish_msg(psmq, PSMQ_CTRL_CMD_UNSUBSCRIBE,
 			psmq->fd, topic, NULL, 0, 0);
+}
+
+
+/* ==========================================================================
+    Sends ioctl to alter how broker interfacts with client.
+
+    Returns 0 on success or -1 on error
+
+    errno:
+            EINVAL      psmq is invalid (null)
+            EINVAL      req is not a valid ioctl request
+            EBADF       psmq has not been initialized
+   ========================================================================== */
+
+
+int psmq_ioctl
+(
+	struct psmq   *psmq,        /* psmq object */
+	int            req,         /* ioctl request to make */
+	...                         /* variadic data for req */)
+{
+	int            val_int;     /* ap value treated as integer */
+	unsigned short val_ushort;  /* ap value treated as unsigned short */
+	va_list        ap;          /* variadic argument */
+	char           buf[32];     /* buffer with ioctl data to send to broker */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+	VALID(EINVAL, psmq);
+	VALID(EBADF, psmq->qsub != (mqd_t)-1);
+	VALID(EBADF, psmq->qsub != psmq->qpub);
+
+	va_start(ap, req);
+	memset(buf, 0x00, sizeof(buf));
+	buf[0] = req;
+
+	switch (req)
+	{
+	/* ==================================================================
+	                       __        __   _                        __
+	      ____ ___  ___   / /__ __  / /_ (_)__ _  ___  ___  __ __ / /_
+	     / __// -_)/ _ \ / // // / / __// //  ' \/ -_)/ _ \/ // // __/
+	    /_/   \__// .__//_/ \_, /  \__//_//_/_/_/\__/ \___/\_,_/ \__/
+	             /_/       /___/
+	   ================================================================== */
+
+	case PSMQ_IOCTL_REPLY_TIMEOUT:
+		/* va_arg cannot accept short as type, so we
+		 * need this intermediate step to extract int
+		 * first, and then assign it to ushort */
+		val_int = va_arg(ap, int);
+		VALID(EINVAL, val_int <= USHRT_MAX);
+
+		val_ushort = val_int;
+		memcpy(buf + 1, &val_ushort, sizeof(val_ushort));
+		return psmq_publish_msg(psmq, PSMQ_CTRL_CMD_IOCTL, psmq->fd, NULL,
+				buf, 1 + sizeof(val_ushort), 0);
+
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+}
+
+
+/* ==========================================================================
+    Sets time in ms, how long broker will wait for us to take some messages
+    from mqueue, in case our mqueue is full.
+
+    Note: if you set this to high value, and you are notoriously slow to get
+    messages from the queue, this may severy impact performance of broker,
+    as broker is single threaded by design, and will hang when it has to
+    wait for client.
+   ========================================================================== */
+
+
+int psmq_ioctl_reply_timeout
+(
+	struct psmq   *psmq,  /* psmq object */
+	unsigned short val    /* timeout value in ms */
+)
+{
+	return psmq_ioctl(psmq, PSMQ_IOCTL_REPLY_TIMEOUT, val);
 }

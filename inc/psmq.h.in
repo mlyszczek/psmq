@@ -13,7 +13,14 @@
 #define PSMQ_CTRL_CMD_SUBSCRIBE   's'
 #define PSMQ_CTRL_CMD_UNSUBSCRIBE 'u'
 #define PSMQ_CTRL_CMD_PUBLISH     'p'
+#define PSMQ_CTRL_CMD_IOCTL       'i'
 
+enum PSMQ_IOCTL
+{
+	PSMQ_IOCTL_INVALID = 0,
+	PSMQ_IOCTL_REPLY_TIMEOUT,
+	PSMQ_IOCTL_MAX
+};
 
 #ifndef PSMQ_MSG_MAX
 #define PSMQ_MSG_MAX (@PSMQ_MSG_MAX@)
@@ -90,5 +97,8 @@ int psmq_timedreceive(struct psmq *psmq, struct psmq_msg *msg,
 		unsigned *prio, struct timespec *tp);
 int psmq_timedreceive_ms(struct psmq *psmq, struct psmq_msg *msg,
 		unsigned *prio, size_t ms);
+
+int psmq_ioctl(struct psmq *psmq, int req, ...);
+int psmq_ioctl_reply_timeout(struct psmq *psmq, unsigned short val);
 
 #endif /* PSMQ_H */

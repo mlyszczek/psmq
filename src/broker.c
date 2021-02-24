@@ -82,6 +82,10 @@ struct client
 	/* how many times did client missed pub because it's queue
 	 * was full? */
 	unsigned char  missed_pubs;
+
+	/* how long will broker wait for client to free up space in
+	 * its mqueue after giving up and discarding message */
+	unsigned short  reply_timeout;
 };
 
 
@@ -259,7 +263,8 @@ static int psmqd_broker_reply_mq
 	const char      *topic,    /* topic to send message with */
 	const void      *payload,  /* data to send to the client */
 	unsigned         paylen,   /* length of payload to send */
-	unsigned int     prio      /* message priority */
+	unsigned int     prio,     /* message priority */
+	unsigned short   timeout   /* timeout in milliseconds */
 )
 {
 	struct psmq_msg  msg;      /* structure with message to send */
@@ -285,8 +290,7 @@ static int psmqd_broker_reply_mq
 	/* send data to client, but do not wait if its queue
 	 * is full, if it cannot process messages quick enough
 	 * it does not deserve new message */
-	tp.tv_sec = 0;
-	tp.tv_nsec = 0;
+	psmq_ms_to_tp(timeout, &tp);
 	return mq_timedsend(mq, (char *)&msg, psmq_real_msg_size(msg), prio, &tp);
 }
 
@@ -310,7 +314,7 @@ static int psmqd_broker_reply
 )
 {
 	if (psmqd_broker_reply_mq(clients[fd].mq, cmd,
-			data,topic, payload, paylen, prio) == 0)
+			data,topic, payload, paylen, prio, clients[fd].reply_timeout) == 0)
 	{
 		clients[fd].missed_pubs = 0;
 		return 0;
@@ -412,7 +416,8 @@ static int psmqd_broker_open
 	{
 		/* all slots are taken, send error information to the client */
 		el_oprint(OELW, "open failed client %s: no free slots", qname);
-		psmqd_broker_reply_mq(qc, PSMQ_CTRL_CMD_OPEN, ENOSPC, NULL, NULL, 0, 0);
+		psmqd_broker_reply_mq(qc, PSMQ_CTRL_CMD_OPEN, ENOSPC,
+				NULL, NULL, 0, 0, 0);
 		mq_close(qc);
 		return -1;
 	}
@@ -421,7 +426,7 @@ static int psmqd_broker_open
 
 	/* we have free slot and all data has been allocated, send
 	 * client file descriptor he can use to control communication */
-	psmqd_broker_reply_mq(qc, PSMQ_CTRL_CMD_OPEN, 0, NULL, &fd, 1, 0);
+	psmqd_broker_reply_mq(qc, PSMQ_CTRL_CMD_OPEN, 0, NULL, &fd, 1, 0, 0);
 	el_oprint(OELN, "[%3d] opened %s", fd, qname);
 	return 0;
 }
@@ -739,6 +744,99 @@ static int psmqd_broker_publish
 
 
 /* ==========================================================================
+    Changes settings for client to alter how broker interacts with client.
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+     request:
+            ctrl.cmd    char    PSMQ_CTRL_CMD_IOCTL
+            ctrl.data   uchar   file descriptor of requesting client
+            paylen      uint    size of data.payload
+            data
+                ioctl   uchar   ioctl request
+                data    varial  variable, depending on ioctl request
+
+    response
+            ctrl.cmd    char    PSMQ_CTRL_CMD_IOCTL
+            ctrl.data   uchar   0 on success, otherwise errno
+            paylen      uint    size of data.payload
+            data
+                ioctl   uchar   ioctl request that was requested to be set
+                data    varial  newly set value of request
+   ========================================================================== */
+
+
+static void psmqd_broker_reply_ioctl
+(
+	int            fd,       /* fd of client to send message to */
+	unsigned char  err,      /* errno reply */
+	unsigned char  req,      /* ioctl request */
+	void          *data,     /* extra data */
+	int            datalen   /* length of extra */
+)
+{
+	char           buf[16];  /* req + data to send to client */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+	buf[0] = req;
+	if (data)
+		memcpy(buf + 1, data, datalen);
+	psmqd_broker_reply(fd, PSMQ_CTRL_CMD_IOCTL, err, NULL, buf, 1 + datalen, 0);
+}
+
+static int psmqd_broker_ioctl
+(
+	struct psmq_msg  *msg       /* ioctl request */
+)
+{
+	struct client    *client;   /* handle to client that requested ioctl */
+	unsigned char     fd;       /* client's file descriptor */
+	unsigned char     req;      /* ioctl request */
+	char             *data;     /* data associated with req */
+	unsigned short    dlen;     /* length of data */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+	fd = msg->ctrl.data;
+	req = msg->data[0];
+	client = &clients[fd];
+
+	if (msg->paylen < 1)
+	{
+		el_oprint(OELE, "[%3d] ioctl error, no request specified", fd);
+		psmqd_broker_reply_ioctl(fd, EINVAL, 0, NULL, 0);
+		return -1;
+	}
+
+	/* set data to contain only data associated
+	 * with req without request id itself */
+	dlen = msg->paylen - 1;
+	data = msg->data + 1;
+
+	switch (req)
+	{
+	case PSMQ_IOCTL_REPLY_TIMEOUT:
+		if (dlen != sizeof(client->reply_timeout))
+		{
+			el_oprint(OELE, "[%3d] ioctl error, invalid data", fd);
+			psmqd_broker_reply_ioctl(fd, EINVAL, req, data, dlen);
+			return -1;
+		}
+
+		memcpy(&client->reply_timeout, data, dlen);
+		el_oprint(OELN, "[%3d] ioctl: set reply_timeout to %u",
+				fd, client->reply_timeout);
+		psmqd_broker_reply_ioctl(fd, 0, req, &client->reply_timeout, dlen);
+		return 0;
+
+	default:
+		el_oprint(OELE, "[%3d] ioctl error, invalid request: %d", fd, req);
+		psmqd_broker_reply_ioctl(fd, EINVAL, req, NULL, 0);
+		return -1;
+
+	}
+}
+
+/* ==========================================================================
                        __     __ _          ____
         ____   __  __ / /_   / /(_)_____   / __/__  __ ____   _____ _____
        / __ \ / / / // __ \ / // // ___/  / /_ / / / // __ \ / ___// ___/
@@ -915,6 +1013,7 @@ int psmqd_broker_start(void)
 			case 's': psmqd_broker_subscribe(&msg); break;
 			case 'u': psmqd_broker_unsubscribe(&msg); break;
 			case 'p': psmqd_broker_publish(&msg, prio); break;
+			case 'i': psmqd_broker_ioctl(&msg); break;
 			default:
 				el_oprint(OELW, "received unknown request '%c'",
 						msg.data[1]);
