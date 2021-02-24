@@ -699,7 +699,7 @@ static int psmqd_broker_publish
 
 					el_oprint(OELE, "[%3d] failed to send msg to client "
 							"for %d consecutive calls, delete client",
-							PSMQ_MAX_MISSED_PUBS);
+							fd, PSMQ_MAX_MISSED_PUBS);
 
 					/* client assumed dead, it's queue now is
 					 * most probably full, but there still is
