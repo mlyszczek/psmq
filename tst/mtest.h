@@ -3,7 +3,7 @@
     Author: Michał Łyszczek <michal.lyszczek@bofc.pl>
    ==========================================================================
            __________________________________________________________
-          /                      mtest v1.4.0                        \
+          /                      mtest v1.4.1                        \
           |                  https://mtest.bofc.pl                   |
           |                                                          |
           |    Simple test framework that uses TAP output format     |
@@ -108,7 +108,7 @@
    ========================================================================== */
 
 
-#define mt_run_param(f, p) mt_run_param_named(f, p, #f)
+#define mt_run_param(f, p) mt_run_param_named(f, p, #f "(" #p ")")
 
 
 /* ==========================================================================
