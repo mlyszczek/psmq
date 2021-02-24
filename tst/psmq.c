@@ -329,6 +329,26 @@ static void psmq_initialize_too_much_clients(void)
 
 
 /* ==========================================================================
+   ========================================================================== */
+
+
+void psmq_set_reply_timeout(unsigned short timeout)
+{
+	char            expect[8];
+	int             explen;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+	timeout = 100;
+	expect[0] = PSMQ_IOCTL_REPLY_TIMEOUT;
+	memcpy(expect + 1, &timeout, sizeof(timeout));
+	explen = 1 + sizeof(timeout);
+
+	mt_fok(psmq_ioctl_reply_timeout(&gt_sub_psmq, timeout));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'i', 0, explen, NULL, expect));
+}
+
+
+/* ==========================================================================
              __               __
             / /_ ___   _____ / /_   ____ _ _____ ____   __  __ ____
            / __// _ \ / ___// __/  / __ `// ___// __ \ / / / // __ \
@@ -442,6 +462,10 @@ void psmq_test_group(void)
 	buf[PSMQ_MSG_MAX] = '\0';
 	CHECK_ERR(psmq_unsubscribe(&gt_pub_psmq, buf), ENOBUFS);
 
+	CHECK_ERR(psmq_ioctl_reply_timeout(NULL, 10), EINVAL);
+	CHECK_ERR(psmq_ioctl_reply_timeout(&psmq_uninit, 10), EBADF);
+	CHECK_ERR(psmq_ioctl(&gt_sub_psmq, PSMQ_IOCTL_REPLY_TIMEOUT, USHRT_MAX + 1u),
+			EINVAL);
 
 
 	mt_run(psmq_unsub);
@@ -456,4 +480,8 @@ void psmq_test_group(void)
 	mt_run(psmq_sub_after_init);
 	mt_run(psmq_unsub_after_init);
 	mt_run(psmq_unsub_not_subscribed);
+	mt_run_param(psmq_set_reply_timeout, 0);
+	mt_run_param(psmq_set_reply_timeout, 100);
+	mt_run_param(psmq_set_reply_timeout, USHRT_MAX - 1);
+	mt_run_param(psmq_set_reply_timeout, USHRT_MAX);
 }

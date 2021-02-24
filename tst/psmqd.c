@@ -104,6 +104,7 @@ static void *multi_sub_thread
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 		tl = args->tl;
+		memset(&msg, 0x00, sizeof(msg));
 
 		if (psmq_receive(args->psmq, &msg, NULL) == -1)
 			return NULL;
@@ -113,7 +114,7 @@ static void *multi_sub_thread
 			return NULL;
 
 		/* transform "topic\0payload" into
-		 * topic payload" format */
+		 * "topic payload" format */
 		msg.data[strlen(msg.data)] = ' ';
 
 		/* add data to a list */
@@ -150,7 +151,7 @@ static void *multi_pub_thread
 		data[0] = '/';
 		data[1] = '1' + args->id;
 		data[2] = '\0';
-		paylen = rand() % (PSMQ_MSG_MAX - 3 + 1);
+		paylen = rand() % (PSMQ_MSG_MAX - 5 + 1);
 
 		data[3] = '\0';
 		psmqt_gen_random_string(data + 3, paylen);
@@ -659,6 +660,55 @@ static void psmqd_send_msg_with_bad_fd(void)
    ========================================================================== */
 
 
+static void psmqd_detect_dead_client(void)
+{
+	char             qname[2][QNAME_LEN];
+	struct psmq      pub_psmq;
+	struct psmq      sub_psmq;
+	struct psmq_msg  msg;
+	struct timespec  tp;
+	int              i;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+	psmqt_gen_unique_queue_name_array(qname, 2, QNAME_LEN);
+	mt_fail(psmq_init(&pub_psmq, gt_broker_name, qname[0], 10) == 0);
+	mt_fail(psmq_init(&sub_psmq, gt_broker_name, qname[1], 10) == 0);
+	mt_fok(psmq_subscribe(&sub_psmq, "/t"));
+	mt_fok(psmqt_receive_expect(&sub_psmq, 's', 0, 0, "/t", NULL));
+
+	for (i = 0; i != 10; ++i)
+		mt_fok(psmq_publish(&pub_psmq, "/t", &i, sizeof(i), 0));
+	/* from now on, messages will be lost and missed pubs should
+	 * be increased in broker */
+	for (i = 0; i != 10; ++i)
+		mt_fok(psmq_publish(&pub_psmq, "/t", &i, sizeof(i), 0));
+
+	/* need to give broker some time to actually publish messages
+	 * before we read them, and making more space on the queue */
+	tp.tv_sec = 1;
+	tp.tv_nsec = 0;
+	nanosleep(&tp, NULL);
+
+	/* last message should have caused broker to remove sub_psmq
+	 * client, remove oldest published message and put close
+	 * message on queue, let's check if that's true */
+	for (i = 1; i != 10; ++i)
+		mt_fok(psmqt_receive_expect(&sub_psmq, 'p', 0, sizeof(i), "/t", &i));
+
+	mt_fok(psmqt_receive_expect(&sub_psmq, 'c', 0, 0, NULL, NULL));
+
+	mt_fok(psmq_cleanup(&pub_psmq));
+	mt_fok(psmq_cleanup(&sub_psmq));
+	mq_unlink(qname[0]);
+	mq_unlink(qname[1]);
+}
+
+
+/* ==========================================================================
+   ========================================================================== */
+
+
 static void psmqd_multi_pub_sub(void *arg)
 {
 	struct multi_ps_targs  *pub_targs;
@@ -699,6 +749,7 @@ static void psmqd_multi_pub_sub(void *arg)
 		/* subscribe to "/s" topic, this is "stop" message to
 		 * thread so it knows when to exit */
 		mt_fok(psmq_subscribe(&psmq_sub[i], "/s"));
+		mt_fok(psmqt_receive_expect(&psmq_sub[i], 's', 0, 0, "/s", NULL));
 	}
 
 	/* clients created, now subscribe all sub clients
@@ -733,6 +784,13 @@ static void psmqd_multi_pub_sub(void *arg)
 			{
 				topic[1] = '1' + j;
 				mt_fok(psmq_subscribe(&psmq_sub[i], topic));
+				mt_fok(psmqt_receive_expect(&psmq_sub[i],
+							's', 0, 0, topic, NULL));
+				mt_fok(psmq_ioctl_reply_timeout(&psmq_sub[i], 100));
+				/* receive anything to pop reply from the queue, we
+				 * don't need to verify it as this route is verified
+				 * elsewhere */
+				psmqt_receive_expect(&psmq_sub[i], 'i', 0, 0, NULL, NULL);
 			}
 		}
 	}
@@ -781,9 +839,11 @@ static void psmqd_multi_pub_sub(void *arg)
 	for (i = 0; i != args->num_pub; ++i)
 		pthread_join(pub_t[i], NULL);
 
-	/* tell subscribers to stop receiving and exit */
-	for (i = 0; i != args->num_sub; ++i)
-		psmq_publish(&psmq_sub[i], "/s", NULL, 0, 0);
+	/* tell subscribers to stop receiving and exit,
+	 * all sub threads are subscribe to /s so it's
+	 * enough to send stop by one client only, and
+	 * all clients will receive it */
+	psmq_publish(&psmq_sub[0], "/s", NULL, 0, 0);
 
 	/* wait for all subscribers to finish
 	 * receiving data and exit */
@@ -831,6 +891,7 @@ static void psmqd_multi_pub_sub(void *arg)
 	for (i = 0; i != args->num_sub; ++i)
 	{
 		mt_fok(psmq_cleanup(&psmq_sub[i]));
+		psmqt_receive_expect(&psmq_sub[i], 'c', 0, 0, NULL, NULL);
 		mq_unlink(qsub[i]);
 		free(qsub[i]);
 	}
@@ -843,6 +904,7 @@ static void psmqd_multi_pub_sub(void *arg)
 	for (i = 0; i != args->num_pub; ++i)
 	{
 		mt_fok(psmq_cleanup(&psmq_pub[i]));
+		psmqt_receive_expect(&psmq_pub[i], 'c', 0, 0, NULL, NULL);
 		mq_unlink(qpub[i]);
 		psmqd_tl_destroy(pub_tl[i]);
 		free(qpub[i]);
@@ -1192,6 +1254,54 @@ static void psmqd_reply_to_full_queue(void)
 
 
 /* ==========================================================================
+   ========================================================================== */
+
+
+void psmqd_invalid_ioctl_request(void)
+{
+	char  buf[16];
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+	buf[0] = PSMQ_IOCTL_INVALID;
+	mt_fok(psmq_publish_msg(&gt_sub_psmq, 'i', gt_sub_psmq.fd,
+				NULL, buf, 1, 0));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'i', EINVAL, 1, NULL, buf));
+}
+
+
+/* ==========================================================================
+   ========================================================================== */
+
+
+void psmqd_invalid_ioctl_request2(void)
+{
+	char  buf[16];
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+	buf[0] = PSMQ_IOCTL_MAX;
+	mt_fok(psmq_publish_msg(&gt_sub_psmq, 'i', gt_sub_psmq.fd,
+				NULL, buf, 1, 0));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'i', EINVAL, 1, NULL, buf));
+}
+
+
+/* ==========================================================================
+   ========================================================================== */
+
+
+void psmqd_no_ioctl_request(void)
+{
+	char  buf[16];
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+	buf[0] = PSMQ_IOCTL_INVALID;
+	mt_fok(psmq_publish_msg(&gt_sub_psmq, 'i', gt_sub_psmq.fd,
+				NULL, NULL, 0, 0));
+	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'i', EINVAL, 1, NULL, buf));
+}
+
+
+/* ==========================================================================
              __               __
             / /_ ___   _____ / /_   ____ _ _____ ____   __  __ ____
            / __// _ \ / ___// __/  / __ `// ___// __ \ / / / // __ \
@@ -1208,7 +1318,7 @@ void psmqd_test_group(void)
 	char             mps_name[64];
 	struct multi_ps  mps;
 
-#if PSMQ_PAYLOAD_MAX < 6
+#if PSMQ_MSG_MAX < 6
 	/* these tests may spawn a lot of mqueues, so to prevent
 	 * name clashes (and thus weird test failures), payload
 	 * must be big enough to create that much queues */
@@ -1254,6 +1364,9 @@ void psmqd_test_group(void)
 	mt_run(psmqd_send_too_big_msg);
 	mt_run(psmqd_send_unknown_control_msg);
 	mt_run(psmqd_unsubscribe);
+	mt_run(psmqd_invalid_ioctl_request);
+	mt_run(psmqd_invalid_ioctl_request2);
+	mt_run(psmqd_no_ioctl_request);
 
 	/* tests that creates own custom set of clients, and only need
 	 * broker to start/stop */
@@ -1273,6 +1386,7 @@ void psmqd_test_group(void)
 	mt_run(psmqd_topic_star_wildcard);
 	mt_run(psmqd_topic_mixed_wildcard);
 	mt_run(psmqd_reply_to_full_queue);
+	mt_run(psmqd_detect_dead_client);
 
 	for (mps.num_pub = 1; mps.num_pub <= num_pub_max; ++mps.num_pub)
 	{

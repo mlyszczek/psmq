@@ -409,22 +409,27 @@ int psmqt_receive_expect
 {
 	int              e;
 	struct psmq_msg  msg;
+	int              topiclen;
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 	if (psmq_receive(psmq, &msg, NULL) == -1)
 		return -1;
+
+	topiclen = 0;
+	if (strchr("spu", cmd))
+		topiclen = strlen(msg.data) + 1;
 
 	e = 0;
 
 	e |= msg.ctrl.cmd != cmd;
 	e |= msg.ctrl.data != data;
 	e |= msg.paylen != paylen;
-	e |= strcmp(msg.data, topic);
-	if (paylen == 0 && strlen(msg.data) == 0)
+	if (topic)
+		e |= strcmp(msg.data, topic);
+	if (paylen == 0 && topiclen == 0)
 		e |= msg.data[0] != '\0';
 	if (msg.paylen && paylen && payload)
-		e |= memcmp(msg.data + strlen(msg.data) + 1, payload, msg.paylen);
+		e |= memcmp(msg.data + topiclen, payload, msg.paylen);
 
 	return e;
 }
-
