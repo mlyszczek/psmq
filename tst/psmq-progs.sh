@@ -488,6 +488,65 @@ psmq_pub_empty_message()
         \"${psmqs_stdout}\""
     stop_psmqs
 }
+psmq_pub_binary_single()
+{
+    start_psmqs
+    msg=$(mktemp)
+    count=$((psmq_msg_max - 1 - 3))
+    dd if=/dev/urandom of=$msg bs=1 count=${count} 2>/dev/null
+    cat $msg | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -B
+    mt_fail "psmq_grep \"topic: /1, priority: 2, paylen: $count, \" \
+        \"${psmqs_stdout}\""
+    rm $msg
+    stop_psmqs
+}
+psmq_pub_binary_max()
+{
+    start_psmqs
+    msg=$(mktemp)
+    count=$((psmq_msg_max - 3))
+    dd if=/dev/urandom of=$msg bs=1 count=${count} 2>/dev/null
+    cat $msg | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -B
+    mt_fail "psmq_grep \"topic: /1, priority: 2, paylen: $count, \" \
+        \"${psmqs_stdout}\""
+    rm $msg
+    stop_psmqs
+}
+psmq_pub_binary_split()
+{
+    start_psmqs
+    msg=$(mktemp)
+    count=$((psmq_msg_max - 3 + 1))
+    splt_count=$((count - 1))
+    dd if=/dev/urandom of=$msg bs=1 count=${count} 2>/dev/null
+    cat $msg | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -B
+    mt_fail "psmq_grep \"topic: /1, priority: 2, paylen: $splt_count\" \
+        \"${psmqs_stdout}\""
+    mt_fail "psmq_grep \"topic: /1, priority: 2, paylen: 1, \" \
+        \"${psmqs_stdout}\""
+    rm $msg
+    stop_psmqs
+}
+psmq_pub_binary_many_split()
+{
+    start_psmqs
+    msg=$(mktemp)
+    # 4 full messages + one splitted byte
+    count=$((4 * (psmq_msg_max - 3) + 1))
+    splt_count=$((psmq_msg_max - 3))
+    dd if=/dev/urandom of=$msg bs=1 count=${count} 2>/dev/null
+    cat $msg | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -B
+    # first check for last split, this will make sure that previous
+    # splits are in a log file as well
+    mt_fail "psmq_grep \"topic: /1, priority: 2, paylen: 1, \" \
+        \"${psmqs_stdout}\""
+    # now do custom grep and check if we have 4 full splits
+    split_count=$(grep "topic: /1, priority: 2, paylen: $splt_count" \
+            $psmqs_stdout | wc -l)
+    mt_fail "[ $split_count -eq 4 ]"
+    rm $msg
+    stop_psmqs
+}
 
 psmq_pub_from_stdin_with_invalid_prio()
 {
@@ -575,6 +634,10 @@ mt_run psmq_pub_missing_b_argument
 mt_run psmq_pub_missing_t_argument
 mt_run psmq_sub_topic_too_long
 mt_run psmq_pub_empty_message
+mt_run psmq_pub_binary_single
+mt_run psmq_pub_binary_max
+mt_run psmq_pub_binary_split
+mt_run psmq_pub_binary_many_split
 
 if [ ${psmq_msg_max} -gt 2 ]
 then

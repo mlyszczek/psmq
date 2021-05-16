@@ -48,15 +48,16 @@
 
 
 /* ==========================================================================
-    Publishes single string 'messages' on 'topic' to 'psmq'
+    Publishes single messages with 'payload' on 'topic' to 'psmq'. Returns
+    0 on success, and -1 on error.
    ========================================================================== */
 
 
-static void send_message
+static int publish
 (
 	struct psmq  *psmq,     /* psmq object */
 	const char   *topic,    /* topic of the message */
-	const char   *message,  /* payload of the message */
+	const char   *payload,  /* payload of the message */
 	size_t        paylen,   /* message length */
 	unsigned int  prio      /* message priority */
 )
@@ -64,26 +65,26 @@ static void send_message
 	/* message set in program arguments, simply
 	 * send message and exit */
 
-	if (psmq_publish(psmq, topic, message, paylen, prio) != 0)
+	if (psmq_publish(psmq, topic, payload, paylen, prio) == 0)
+		return 0;
+
+	switch (errno)
 	{
-		switch (errno)
-		{
-		case EINVAL:
-			fprintf(stderr, "f/failed to publish, invalid prio %u\n", prio);
-			break;
+	case EINVAL:
+		fprintf(stderr, "f/failed to publish, invalid prio %u\n", prio);
+		break;
 
-		case EBADMSG:
-			fprintf(stderr, "f/failed to publish to %s invalid topic\n",
-					topic);
-			break;
+	case EBADMSG:
+		fprintf(stderr, "f/failed to publish to %s invalid topic\n",
+				topic);
+		break;
 
-		case ENOBUFS:
-			fprintf(stderr, "f/topic or message is too long\n");
-			break;
-		}
-
-		return;
+	case ENOBUFS:
+		fprintf(stderr, "f/topic or message is too long\n");
+		break;
 	}
+
+	return -1;
 }
 
 
@@ -160,22 +161,60 @@ static void send_stdin
 		/* now we have full line in buffer, ship
 		 * it. -1 is just so publish don't send
 		 * newline character */
-		if (psmq_publish(psmq, topic, line, strlen(line) + 1, prio) != 0)
+		if (publish(psmq, topic, line, strlen(line) + 1, prio) != 0)
+			return;
+	}
+}
+
+
+/* ==========================================================================
+    Sends whatever shows on the stdin on 'topic' to 'psmq' broker. Invokes
+    one psmq_publish() per PSMQ_MSG_MAX - strlen(topic) bytes read, or less
+    when stdin ends.  Basically works as a stream, when stdin message is
+    larger than PSMQ_MSG_MAX, it will be split into multiple psmq messages.
+
+    Since it is impossible to read stdin in binary mode in portable way, we
+    won't be hacking it with freopen() as it's platform dependant anyway,
+    and will use posix read() straight away as it's simpler and better for
+    that purpose. And nobody cares about Windows anyway.
+   ========================================================================== */
+
+
+static void send_stdin_binary
+(
+	struct psmq  *psmq,      /* psmq object */
+	const char   *topic,     /* topic of the message */
+	unsigned int  prio       /* message priority */
+)
+{
+	unsigned int  topiclen;  /* length of topic string */
+	unsigned int  r;         /* value returned from read() */
+	unsigned char data[PSMQ_MSG_MAX];  /* single data packet read from stdin */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+	topiclen = strlen(topic) + 1 /* null character is also send with topic */;
+
+	for (;;)
+	{
+		r = read(STDIN_FILENO, data, sizeof(data) - topiclen);
+
+		if (r == -1)
 		{
-			switch (errno)
-			{
-			case EINVAL:
-				fprintf(stderr, "f/failed to publish, invalid prio %u\n", prio);
-				break;
-
-			case EBADMSG:
-				fprintf(stderr, "f/failed to publish to %s invalid topic\n",
-						topic);
-				break;
-			}
-
+			fprintf(stderr, "Failed to read from stdin: %s (%d)\n",
+					strerror(errno), errno);
 			return;
 		}
+
+		/* end of file reached, nothing more to send */
+		if (r == 0)
+			return;
+
+		/* send over psmq what has been read */
+		if (publish(psmq, topic, data, r, prio) != 0)
+			return;
+
+		/* there is probably more data to send, continue */
 	}
 }
 
@@ -202,6 +241,7 @@ int psmq_pub_main
 {
 	int          arg;          /* arg for getopt() */
 	int          send_empty;   /* flag: send empty message on topic */
+	int          send_binary;  /* flag: send binary data from stdin */
 	unsigned int prio;         /* message priority */
 	const char  *broker_name;  /* queue name of the broker */
 	const char  *qname;        /* name of the client queue */
@@ -216,11 +256,12 @@ int psmq_pub_main
 	topic = NULL;
 	qname = NULL;
 	send_empty = 0;
+	send_binary = 0;
 	prio = 0;
 
 	/* read input arguments */
 	optind = 1;
-	while ((arg = getopt(argc, argv, ":hvet:b:m:n:p:")) != -1)
+	while ((arg = getopt(argc, argv, ":hvet:b:Bm:n:p:")) != -1)
 	{
 		switch (arg)
 		{
@@ -230,6 +271,7 @@ int psmq_pub_main
 		case 'n': qname = optarg; break;
 		case 'p': prio = atoi(optarg); break;
 		case 'e': send_empty = 1; break;
+		case 'B': send_binary = 1; break;
 		case 'v':
 			printf("%s v"PACKAGE_VERSION"\n"
 					"by Michał Łyszczek <michal.lyszczek@bofc.pl>\n", argv[0]);
@@ -284,9 +326,9 @@ int psmq_pub_main
 		return 1;
 	}
 
-	if (message && send_empty)
+	if ((!!message + send_binary + send_empty) > 1)
 	{
-		fprintf(stderr, "f/-m and -e cannot coexist\n");
+		fprintf(stderr, "f/only one of -m, -e and -B can be used\n");
 		return 1;
 	}
 
@@ -317,9 +359,11 @@ int psmq_pub_main
 	}
 
 	if (send_empty)
-		send_message(&psmq, topic, NULL, 0, prio);
+		publish(&psmq, topic, NULL, 0, prio);
+	else if (send_binary)
+		send_stdin_binary(&psmq, topic, prio);
 	else if (message)
-		send_message(&psmq, topic, message, strlen(message) + 1, prio);
+		publish(&psmq, topic, message, strlen(message) + 1, prio);
 	else
 		send_stdin(&psmq, topic, prio);
 

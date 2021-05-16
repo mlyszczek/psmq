@@ -17,7 +17,7 @@
 .IR topic )
 .RB [ -m
 .IR message \ |
-.BR -e ]
+.BR -e \ | \ -B \ ]
 .RB [ -n
 .IR mqueue-name ]
 .RB [ -p
@@ -62,6 +62,12 @@ Input is read until end of file is encoutered.
 .B -e
 When set, a single message without payload will be sent on
 .IR topic .
+.TP
+.B -B
+When -B flag is passed, binary data is read from stdin.
+If data is too big and will not fit into single psmq frame, data will be
+split into multiple frames which will be delivered in order (unless other
+message is sent on the same topic in the same time).
 .TP
 .BI -p\  prio
 Priority of the message.
