@@ -285,7 +285,8 @@ static int psmqd_broker_reply_mq
 		strcpy(msg.data, topic);
 	}
 
-	memcpy(msg.data + topiclen, payload, paylen);
+	if (payload && paylen)
+		memcpy(msg.data + topiclen, payload, paylen);
 
 	/* send data to client, but do not wait if its queue
 	 * is full, if it cannot process messages quick enough
