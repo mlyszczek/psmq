@@ -21,6 +21,7 @@
 /coverage.info
 /coveragereport/
 /depcomp
+/inc/psmq.h
 /install-sh
 /libtool
 /ltmain.sh
@@ -30,6 +31,8 @@
 /psmq-config.h
 /psmq-config.h.in
 /psmqd.log
+/pvs-studio.log
+/report.tasks
+/strace_out
 /stamp-h1
 /test-driver
-/inc/psmq.h
