@@ -57,13 +57,14 @@ static void send_message
 	struct psmq  *psmq,     /* psmq object */
 	const char   *topic,    /* topic of the message */
 	const char   *message,  /* payload of the message */
+	size_t        paylen,   /* message length */
 	unsigned int  prio      /* message priority */
 )
 {
 	/* message set in program arguments, simply
 	 * send message and exit */
 
-	if (psmq_publish(psmq, topic, message, strlen(message) + 1, prio) != 0)
+	if (psmq_publish(psmq, topic, message, paylen, prio) != 0)
 	{
 		switch (errno)
 		{
@@ -200,6 +201,7 @@ int psmq_pub_main
 )
 {
 	int          arg;          /* arg for getopt() */
+	int          send_empty;   /* flag: send empty message on topic */
 	unsigned int prio;         /* message priority */
 	const char  *broker_name;  /* queue name of the broker */
 	const char  *qname;        /* name of the client queue */
@@ -213,11 +215,12 @@ int psmq_pub_main
 	message = NULL;
 	topic = NULL;
 	qname = NULL;
+	send_empty = 0;
 	prio = 0;
 
 	/* read input arguments */
 	optind = 1;
-	while ((arg = getopt(argc, argv, ":hvt:b:m:n:p:")) != -1)
+	while ((arg = getopt(argc, argv, ":hvet:b:m:n:p:")) != -1)
 	{
 		switch (arg)
 		{
@@ -226,6 +229,7 @@ int psmq_pub_main
 		case 't': topic = optarg; break;
 		case 'n': qname = optarg; break;
 		case 'p': prio = atoi(optarg); break;
+		case 'e': send_empty = 1; break;
 		case 'v':
 			printf("%s v"PACKAGE_VERSION"\n"
 					"by Michał Łyszczek <michal.lyszczek@bofc.pl>\n", argv[0]);
@@ -238,7 +242,7 @@ int psmq_pub_main
 					"\n"
 					"usage: \n"
 					"\t%s [-h | -v]\n"
-					"\t%s -b <name> -t <topic> [-m <message>] [-n <mqueue-name>] [-p <prio>]"
+					"\t%s -b <name> -t <topic> [-m <message> | -e] [-n <mqueue-name>] [-p <prio>]"
 					"\n", argv[0], argv[0], argv[0]);
 			printf("\n"
 					"\t-h               print this help and exit\n"
@@ -246,6 +250,7 @@ int psmq_pub_main
 					"\t-b <name>        name of the broker (with leading '/' - like '/qname')\n"
 					"\t-t <topic>       topic on which message should be published\n"
 					"\t-m <message>     message to publish, if not set read from stdin\n"
+					"\t-e               publish message without payload on topic\n"
 					"\t-n <mqueue-name> mqueue name to use by pub to receive data from broker\n"
 					"\t                 if not set, default /psmq_pub will be used\n"
 					"\t-t <prio>        message priority, must be int, default: 0\n");
@@ -279,6 +284,12 @@ int psmq_pub_main
 		return 1;
 	}
 
+	if (message && send_empty)
+	{
+		fprintf(stderr, "f/-m and -e cannot coexist\n");
+		return 1;
+	}
+
 	/* if queue name not set, use default */
 	if (qname == NULL)
 		qname = "/psmq_pub";
@@ -305,8 +316,10 @@ int psmq_pub_main
 		return 1;
 	}
 
-	if (message)
-		send_message(&psmq, topic, message, prio);
+	if (send_empty)
+		send_message(&psmq, topic, NULL, 0, prio);
+	else if (message)
+		send_message(&psmq, topic, message, strlen(message) + 1, prio);
 	else
 		send_stdin(&psmq, topic, prio);
 

@@ -480,6 +480,15 @@ psmq_pub_from_stdin_with_prio()
     mt_fail "psmq_grep \"test.\" \"${psmqs_stdout}\""
     stop_psmqs
 }
+psmq_pub_empty_message()
+{
+    start_psmqs
+    ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -e
+    mt_fail "psmq_grep \"topic: /1, priority: 2, paylen: 0\" \
+        \"${psmqs_stdout}\""
+    stop_psmqs
+}
+
 psmq_pub_from_stdin_with_invalid_prio()
 {
     start_psmqs
@@ -510,6 +519,7 @@ psmqd_print_version()
     mt_fail "psmq_grep \"by Michał Łyszczek <michal.lyszczek@bofc.pl>\" \
         \"${psmqd_stdout}\""
 }
+
 ## ==========================================================================
 ## ==========================================================================
 
@@ -564,6 +574,7 @@ mt_run psmq_pub_no_arguments
 mt_run psmq_pub_missing_b_argument
 mt_run psmq_pub_missing_t_argument
 mt_run psmq_sub_topic_too_long
+mt_run psmq_pub_empty_message
 
 if [ ${psmq_msg_max} -gt 2 ]
 then

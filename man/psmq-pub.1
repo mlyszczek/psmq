@@ -16,7 +16,8 @@
 .RB ( -t
 .IR topic )
 .RB [ -m
-.IR message ]
+.IR message \ |
+.BR -e ]
 .RB [ -n
 .IR mqueue-name ]
 .RB [ -p
@@ -57,6 +58,10 @@ One
 .B psmq
 message will be sent per every new line.
 Input is read until end of file is encoutered.
+.TP
+.B -e
+When set, a single message without payload will be sent on
+.IR topic .
 .TP
 .BI -p\  prio
 Priority of the message.
