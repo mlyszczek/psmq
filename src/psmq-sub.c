@@ -116,7 +116,7 @@ static int on_receive
 			return -1;
 
 		case PSMQ_CTRL_CMD_PUBLISH:
-			el_oprint(ELN, &psmqs_out, "topic: %s, priority: %u, paylen: %lu%s",
+			el_oprint(ELN, &psmqs_out, "topic: %s, priority: %u, paylen: %hu%s",
 					topic, prio, paylen, paylen ? ", payload:" : "");
 			if (paylen)
 				el_opmemory(ELN, &psmqs_out, payload, paylen);
