@@ -639,22 +639,21 @@ mt_run psmq_pub_binary_max
 mt_run psmq_pub_binary_split
 mt_run psmq_pub_binary_many_split
 
-if [ ${psmq_msg_max} -gt 2 ]
-then
-    ###
-    # since line is '\n' and then '\0' for sending a string,
-    # it is not possible to send line when payload is 2
-    #
 
-    mt_run psmq_pub_from_stdin
-    mt_run psmq_pub_from_stdin_max_line
-    mt_run psmq_pub_from_stdin_too_long_line
-    mt_run psmq_pub_from_stdin_multi_line
-    mt_run psmq_pub_from_stdin_too_long_topic
-    mt_run psmq_pub_from_stdin_invalid_topic
-    mt_run psmq_pub_from_stdin_with_prio
-    mt_run psmq_pub_from_stdin_with_invalid_prio
-fi
+###
+# since line is '\n' and then '\0' for sending a string,
+# it is not possible to send line when payload is 2
+#
+
+mt_run psmq_pub_from_stdin
+mt_run psmq_pub_from_stdin_max_line
+mt_run psmq_pub_from_stdin_too_long_line
+mt_run psmq_pub_from_stdin_multi_line
+mt_run psmq_pub_from_stdin_too_long_topic
+mt_run psmq_pub_from_stdin_invalid_topic
+mt_run psmq_pub_from_stdin_with_prio
+mt_run psmq_pub_from_stdin_with_invalid_prio
+
 
 if [ "$(uname)" != "QNX" ]
 then
