@@ -391,7 +391,7 @@ void psmq_test_group(void)
 	CHECK_ERR(psmq_init(&psmq, "/b", "",   10), EINVAL);
 	CHECK_ERR(psmq_init(&psmq, "/b", "/q",  0), EINVAL);
 	CHECK_ERR(psmq_init(&psmq, "/b", "/q", -1), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, buf,  "/q", 10), ENAMETOOLONG);
+	CHECK_ERR(psmq_init(&psmq, "/b", buf, 10), ENAMETOOLONG);
 	CHECK_ERR(psmq_cleanup(NULL), EINVAL);
 	CHECK_ERR(psmq_cleanup(&psmq_uninit), EBADF);
 
