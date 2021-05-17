@@ -422,7 +422,7 @@ psmq_pub_from_stdin_too_long_topic()
     topic="/$(randstr ${topic_len} )"
     echo "msg" | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t${topic} 2> \
         ${psmqp_stderr}
-    mt_fail "psmq_grep \"f/topic is too long, max is 254\" \
+    mt_fail "psmq_grep \"f/topic is too long, max is $((psmq_msg_max - 1))\" \
         \"${psmqp_stderr}\""
 }
 psmq_pub_from_stdin_invalid_topic()
