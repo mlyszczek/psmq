@@ -1,6 +1,6 @@
 #include ../Makefile.am.coverage
 
-psmqd_source = cfg.c globals.c psmqd.c broker.c topic-list.c ../utils.c
+psmqd_source = cfg.c globals.c psmqd.c broker.c topic-list.c $(top_srcdir)/utils.c
 psmqs_source = psmq-sub.c
 psmqp_source = psmq-pub.c
 psmq_headers = cfg.h broker.h globals.h topic-list.h $(top_srcdir)/valid.h \
