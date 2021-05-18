@@ -927,6 +927,8 @@ int psmqd_broker_start(void)
 			return 0;
 		}
 
+		memset(&msg, 0x00, sizeof(msg));
+
 		/* wait for message from client, there is no need to use
 		 * timedreceive, to check for g_psmqd_shutdown flag, as we will
 		 * get EINTR when signal is received

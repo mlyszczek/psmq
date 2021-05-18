@@ -88,10 +88,9 @@ int psmq_publish_msg
 	VALID(EBADF, psmq->qpub != (mqd_t)-1);
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 
+	memset(&pub, 0x00, sizeof(pub));
 	pub.ctrl.cmd = cmd;
 	pub.ctrl.data = data;
-	pub.paylen = 0;
-	pub.data[0] = '\0';
 
 	if (topic)
 		strcpy(pub.data, topic);
@@ -382,6 +381,7 @@ int psmq_init
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
+		memset(&msg, 0x00, sizeof(msg));
 		if ((ack = psmq_receive(psmq, &msg, NULL)) == -1)
 			break;
 

@@ -412,6 +412,7 @@ int psmqt_receive_expect
 	int              topiclen;
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+	memset(&msg, 0x00, sizeof(msg));
 	if (psmq_receive(psmq, &msg, NULL) == -1)
 		return -1;
 

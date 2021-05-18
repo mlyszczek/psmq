@@ -730,8 +730,8 @@ static void psmqd_multi_pub_sub(void *arg)
 	args = arg;
 
 	/* create all clients */
-	psmq_pub = malloc(args->num_pub * sizeof(*psmq_pub));
-	qpub = malloc(args->num_pub * sizeof(char *));
+	psmq_pub = calloc(args->num_pub, sizeof(*psmq_pub));
+	qpub = calloc(args->num_pub, sizeof(char *));
 	for (i = 0; i != args->num_pub; ++i)
 	{
 		qpub[i] = (char *)malloc(sizeof(char) * QNAME_LEN);
@@ -739,8 +739,8 @@ static void psmqd_multi_pub_sub(void *arg)
 		mt_fok(psmq_init(&psmq_pub[i], gt_broker_name, qpub[i], 10));
 	}
 
-	psmq_sub = malloc(args->num_sub * sizeof(*psmq_sub));
-	qsub = malloc(args->num_sub * sizeof(char *));
+	psmq_sub = calloc(args->num_sub, sizeof(*psmq_sub));
+	qsub = calloc(args->num_sub, sizeof(char *));
 	for (i = 0; i != args->num_sub; ++i)
 	{
 		qsub[i] = malloc(sizeof(char) * QNAME_LEN);
@@ -843,7 +843,7 @@ static void psmqd_multi_pub_sub(void *arg)
 	 * all sub threads are subscribe to /s so it's
 	 * enough to send stop by one client only, and
 	 * all clients will receive it */
-	psmq_publish(&psmq_sub[0], "/s", NULL, 0, 0);
+	psmq_publish(&psmq_pub[0], "/s", NULL, 0, 0);
 
 	/* wait for all subscribers to finish
 	 * receiving data and exit */
@@ -1262,6 +1262,7 @@ void psmqd_invalid_ioctl_request(void)
 	char  buf[16];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+	memset(buf, 0x00, sizeof(buf));
 	buf[0] = PSMQ_IOCTL_INVALID;
 	mt_fok(psmq_publish_msg(&gt_sub_psmq, 'i', gt_sub_psmq.fd,
 				NULL, buf, 1, 0));
@@ -1278,6 +1279,7 @@ void psmqd_invalid_ioctl_request2(void)
 	char  buf[16];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+	memset(buf, 0x00, sizeof(buf));
 	buf[0] = PSMQ_IOCTL_MAX;
 	mt_fok(psmq_publish_msg(&gt_sub_psmq, 'i', gt_sub_psmq.fd,
 				NULL, buf, 1, 0));

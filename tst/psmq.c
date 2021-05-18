@@ -216,6 +216,7 @@ static void psmq_publish_timedreceive(void)
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
+	memset(&msg, 0x00, sizeof(msg));
 	clock_gettime(CLOCK_REALTIME, &tp);
 	tp.tv_sec += 1;
 	psmqt_gen_random_string(buf, sizeof(buf));
@@ -246,6 +247,7 @@ static void psmq_publish_timedreceive_ms(void)
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
+	memset(&msg, 0x00, sizeof(msg));
 	psmqt_gen_random_string(buf, sizeof(buf));
 	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
 	mt_fok(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 999));
