@@ -881,14 +881,29 @@ int psmqd_broker_init(void)
 	memset(&mqa, 0x00, sizeof(mqa));
 	mqa.mq_msgsize = sizeof(struct psmq_msg);
 	mqa.mq_maxmsg = g_psmqd_cfg.broker_maxmsg;
-	qctrl = mq_open(g_psmqd_cfg.broker_name,
-			O_RDWR | O_CREAT | O_EXCL, 0600, &mqa);
 
-	if (qctrl == (mqd_t)-1)
+	/* now this is strage behaviour, on dragonfly bsd,
+	 * when you call mq_open() fast enough after
+	 * mq_unlink() it appears that this specific mqueue
+	 * is still in the OS state, and mq_open() will
+	 * return error, so let's try to open it couple
+	 * of times before calling error. Maybe there
+	 * are other OSes with behaviour like that? */
+	for (i = 1; i <= 10; ++i)
 	{
-		el_operror(OELF, "mq_open()");
-		return -1;
+		qctrl = mq_open(g_psmqd_cfg.broker_name,
+				O_RDWR | O_CREAT | O_EXCL, 0600, &mqa);
+
+		if (qctrl != (mqd_t)-1)
+			break;
+
+		el_operror(OELF, "mq_open(); try %d/10", i);
 	}
+
+	/* tried to open mqueue for 10 times now, and
+	 * it's still failing. Oh well. */
+	if (i == 11)
+		return -1;
 
 	el_oprint(OELN, "created queue %s with msgsize %d maxsize %d",
 			g_psmqd_cfg.broker_name, mqa.mq_msgsize, mqa.mq_maxmsg);
