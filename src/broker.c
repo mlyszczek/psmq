@@ -402,7 +402,7 @@ static int psmqd_broker_open
 	qname = msg->data;
 
 	/* open communication line with client */
-	qc = mq_open(qname, O_RDWR, 0600);
+	qc = mq_open(qname, O_RDWR);
 	if (qc == (mqd_t)-1)
 	{
 		/* couldn't open queue provided by client and thus we have
