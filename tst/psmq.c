@@ -373,7 +373,7 @@ void psmq_test_group(void)
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 	tp_inval.tv_sec = -1;
-	tp_inval.tv_nsec = 0;
+	tp_inval.tv_nsec = -1;
 	memset(&tp, 0x00, sizeof(tp));
 	memset(&psmq_uninit, 0x00, sizeof(psmq));
 	psmqt_gen_queue_name(qname, sizeof(qname));
