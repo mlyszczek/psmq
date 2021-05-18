@@ -443,7 +443,12 @@ void psmq_test_group(void)
 
 	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, NULL, NULL, &tp), EINVAL);
 	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, &msg, NULL, NULL), EINVAL);
+#ifndef __NetBSD__
+	/* netbsd is supposed to return error here, but for some reasons
+	 * it behaves as if we passed time = 0, and it returns immediately
+	 * with ETIMEDOUT. Ignore this test on netbsd in that case */
 	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, &msg, NULL, &tp_inval), EINVAL);
+#endif
 	CHECK_ERR(psmq_timedreceive_ms(&gt_pub_psmq, NULL, NULL, 0), EINVAL);
 
 	CHECK_ERR(psmq_subscribe(&gt_pub_psmq, NULL), EINVAL);
