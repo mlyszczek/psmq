@@ -127,7 +127,7 @@ static int psmqt_run_default(void)
 	time_t             start;  /* starting point of waiting for confirmation */
 	struct main_args  *args;   /* allocated args to create psmqd_main() with */
 	struct timespec    tp;     /* time to sleep between psmqd_main() run check*/
-	const char        *argv[] = { "psmqd", "-b", "-l6", "-p./psmqd.log",
+	const char        *argv[] = { "psmqd", "-b", NULL, "-l6", "-p./psmqd.log",
 		"-m10", NULL };
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
