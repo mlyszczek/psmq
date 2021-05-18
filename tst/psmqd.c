@@ -686,7 +686,11 @@ static void psmqd_detect_dead_client(void)
 
 	/* need to give broker some time to actually publish messages
 	 * before we read them, and making more space on the queue */
+#ifdef HIGH_LOAD_ENV
+	tp.tv_sec = 20;
+#else
 	tp.tv_sec = 1;
+#endif
 	tp.tv_nsec = 0;
 	nanosleep(&tp, NULL);
 
@@ -1232,7 +1236,11 @@ static void psmqd_reply_to_full_queue(void)
 
 	/* need to give broker some time to actually publish messages
 	 * before we read them, and making more space on the queue */
+#ifdef HIGH_LOAD_ENV
+	tp.tv_sec = 20;
+#else
 	tp.tv_sec = 1;
+#endif
 	tp.tv_nsec = 0;
 	nanosleep(&tp, NULL);
 	mt_fok(psmq_receive(&sub_psmq, &msg, NULL));

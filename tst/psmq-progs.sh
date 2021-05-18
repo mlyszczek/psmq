@@ -74,7 +74,7 @@ psmq_grep()
         sleep 0.1
 
         i=$((i + 1))
-        if [ ${i} -eq 10 ]
+        if [ ${i} -eq 600 ]
         then
             # not found for specified ammount of time
             return 1
