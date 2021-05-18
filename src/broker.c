@@ -427,9 +427,19 @@ static int psmqd_broker_open
 
 	/* we have free slot and all data has been allocated, send
 	 * client file descriptor he can use to control communication */
-	psmqd_broker_reply_mq(qc, PSMQ_CTRL_CMD_OPEN, 0, NULL, &fd, 1, 0, 0);
-	el_oprint(OELN, "[%3d] opened %s", fd, qname);
-	return 0;
+	if (psmqd_broker_reply_mq(qc, PSMQ_CTRL_CMD_OPEN,
+				0, NULL, &fd, 1, 0, 0) == 0)
+	{
+		el_oprint(OELN, "[%3d] opened %s", fd, qname);
+		return 0;
+	}
+
+	/* for some reason we couldn't send fd to client, log it
+	 * and cleanup this mess */
+	el_operror(OELW, "couldn't send fd to client %s", qname);
+	mq_close(qc);
+	clients[fd].mq = (mqd_t)-1;
+	return -1;
 }
 
 
