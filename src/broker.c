@@ -402,7 +402,7 @@ static int psmqd_broker_open
 	qname = msg->data;
 
 	/* open communication line with client */
-	qc = mq_open(qname, O_RDWR);
+	qc = mq_open(qname, O_RDWR, 0600);
 	if (qc == (mqd_t)-1)
 	{
 		/* couldn't open queue provided by client and thus we have
@@ -878,6 +878,7 @@ int psmqd_broker_init(void)
 	/* open message queue for control, we will
 	 * receive various (like register, publish or
 	 * subscribe) requests via it */
+	memset(&mqa, 0x00, sizeof(mqa));
 	mqa.mq_msgsize = sizeof(struct psmq_msg);
 	mqa.mq_maxmsg = g_psmqd_cfg.broker_maxmsg;
 	qctrl = mq_open(g_psmqd_cfg.broker_name,

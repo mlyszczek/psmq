@@ -335,6 +335,8 @@ int psmq_init
 
 
 	memset(psmq, 0x00, sizeof(struct psmq));
+	memset(&mqa, 0x00, sizeof(mqa));
+
 	mqa.mq_msgsize = sizeof(struct psmq_msg);
 	mqa.mq_maxmsg = maxmsg;
 	psmq->qsub = (mqd_t)-1;
