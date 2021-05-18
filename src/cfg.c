@@ -243,7 +243,10 @@ void psmqd_cfg_print(void)
 #endif
 	CONFIG_PRINT(log_level, "%d");
 	CONFIG_PRINT(colorful_output, "%d");
-	CONFIG_PRINT(program_log, "%s");
+	if (g_psmqd_cfg.program_log)
+		CONFIG_PRINT(program_log, "%s");
+	else
+		CONFIG_PRINT(program_log, "(stderr)");
 	CONFIG_PRINT(broker_name, "%s");
 	CONFIG_PRINT(broker_maxmsg, "%d");
 	CONFIG_PRINT(remove_queue, "%d");
