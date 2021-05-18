@@ -321,6 +321,7 @@ int psmq_init
 	struct mq_attr   mqa;         /* mqueue attributes */
 	int              ack;         /* ACK from the broker after open */
 	size_t           mqnamelen;   /* length of mqname string */
+	int              saveerrno;   /* saved errno value */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -341,6 +342,7 @@ int psmq_init
 	mqa.mq_maxmsg = maxmsg;
 	psmq->qsub = (mqd_t)-1;
 	psmq->qpub = (mqd_t)-1;
+	ack = 0;
 
 	/* if staled queue exist, remove it, so it
 	 * doesn't do weird stuff */
@@ -418,28 +420,36 @@ int psmq_init
 		break;
 	}
 
+	/* ack received and fd is valid,
+	 * we are victorious */
+	if (ack == 0)
+		return 0;
+
+error:
 	/* broker will return either 0 or errno to
 	 * indicate what went wrong on his side, if
 	 * ack is 0, broker will send file descriptor
-	 * to use when communicating with him. */
-	if (ack != 0)
-	{
-		if (ack > 0)
-			errno = ack;
+	 * to use when communicating with him.
+	 *
+	 * if() is here, because we can get here when
+	 * psmq_publish_msg() fails, in which case ack
+	 * will be 0 and then we won't want to set errno
+	 * as it's already set by psmq_publish_msg() */
+	if (ack > 0)
+		errno = ack;
 
-		goto error;
-	}
+	/* some OSes like to overwrite errno with 0 when
+	 * syscalls have succeded. It's unusuall but can
+	 * happen (like on Solaris) */
+	saveerrno = errno;
 
-	/* ack received and fd is valid,
-	 * we are victorious */
-	return 0;
-
-error:
 	mq_close(psmq->qpub);
 	mq_close(psmq->qsub);
 	mq_unlink(mqname);
 	psmq->qpub = (mqd_t)-1;
 	psmq->qsub = (mqd_t)-1;
+
+	errno = saveerrno;
 	return -1;
 }
 
