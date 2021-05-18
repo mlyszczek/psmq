@@ -331,7 +331,7 @@ static void psmqd_create_max_client(void)
 	psmqt_gen_unique_queue_name_array(qname, PSMQ_MAX_CLIENTS, QNAME_LEN);
 
 	for (i = 0; i != PSMQ_MAX_CLIENTS; ++i)
-		mt_assert(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+		mt_fail(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 
 	for (i = 0; i != PSMQ_MAX_CLIENTS; ++i)
 	{
