@@ -288,7 +288,8 @@ int psmq_pub_main
 					"\n"
 					"usage: \n"
 					"\t%s [-h | -v]\n"
-					"\t%s -b <name> -t <topic> [-m <message> | -e] [-n <mqueue-name>] [-p <prio>]"
+					"\t%s -b <name> -t <topic> [-m <message> | -e | -B] "
+							"[-n <mqueue-name>] [-p <prio>]"
 					"\n", argv[0], argv[0], argv[0]);
 			printf("\n"
 					"\t-h               print this help and exit\n"
@@ -297,6 +298,7 @@ int psmq_pub_main
 					"\t-t <topic>       topic on which message should be published\n"
 					"\t-m <message>     message to publish, if not set read from stdin\n"
 					"\t-e               publish message without payload on topic\n"
+					"\t-B               publish stdin read in binary mode\n"
 					"\t-n <mqueue-name> mqueue name to use by pub to receive data from broker\n"
 					"\t                 if not set, default /psmq_pub will be used\n"
 					"\t-t <prio>        message priority, must be int, default: 0\n");
