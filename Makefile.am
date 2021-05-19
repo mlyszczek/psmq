@@ -6,6 +6,15 @@ if HAVE_GCOV
 clean-local: clean-gcov
 endif
 
+distclean-local: pvs-clean
+
+.PHONY: pvs-clean
+pvs-clean:
+	$(RM) strace_out
+	$(RM) report.tasks
+	$(RM) pvs-studio.log
+
+
 EXTRA_DIST = tap-driver.sh psmq-common.h readme.md man2html.sh \
 	gen-download-page.sh
 
