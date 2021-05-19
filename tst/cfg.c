@@ -45,9 +45,6 @@ static void cfg_all_default(void)
 	char  *argv[] = { "psmqd" };
 	psmqd_cfg_init(1, argv);
 
-#if PSMQ_ENABLE_DAEMON
-	mt_fail(g_psmqd_cfg.daemonize == 0);
-#endif
 	mt_fail(g_psmqd_cfg.log_level == EL_INFO);
 	mt_fail(g_psmqd_cfg.colorful_output == 0);
 	mt_fail(g_psmqd_cfg.remove_queue == 0);
@@ -66,9 +63,6 @@ static void cfg_short_opts(void)
 	char *argv[] =
 	{
 		"kurload",
-#if PSMQ_ENABLE_DAEMON
-		"-d",
-#endif
 		"-l4",
 		"-c",
 		"-p", "/var/log/psmqd",
@@ -81,9 +75,6 @@ static void cfg_short_opts(void)
 
 	psmqd_cfg_init(argc, argv);
 
-#if PSMQ_ENABLE_DAEMON
-	mt_fail(g_psmqd_cfg.daemonize == 1);
-#endif
 	mt_fail(g_psmqd_cfg.log_level == 4);
 	mt_fail(g_psmqd_cfg.colorful_output == 1);
 	mt_fail(g_psmqd_cfg.remove_queue == 1);
@@ -102,9 +93,6 @@ static void cfg_mixed_opts(void)
 	char *argv[] =
 	{
 		"kurload",
-#if PSMQ_ENABLE_DAEMON
-		"-d",
-#endif
 		"-l4",
 		"-p", "/var/log/psmqd",
 		"-m1337"
@@ -114,9 +102,6 @@ static void cfg_mixed_opts(void)
 
 	psmqd_cfg_init(argc, argv);
 
-#if PSMQ_ENABLE_DAEMON
-	mt_fail(g_psmqd_cfg.daemonize == 1);
-#endif
 	mt_fail(g_psmqd_cfg.log_level == 4);
 	mt_fail(g_psmqd_cfg.colorful_output == 0);
 	mt_fail(g_psmqd_cfg.remove_queue == 0);
