@@ -5,6 +5,7 @@ www:
 	./post-process.sh
 	chmod a+rX out -R
 
-make clean:
+clean:
+	$(RM) downloads.html
 	$(RM) -r out
 	$(RM) -r manuals
