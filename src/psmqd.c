@@ -120,11 +120,6 @@ int psmqd_main
 		return 1;
 	}
 
-#if PSMQ_ENABLE_DAEMON
-	if (g_psmqd_cfg.daemonize)
-		daemonize(g_psmqd_cfg.pid_file, g_psmqd_cfg.user, g_psmqd_cfg.group);
-#endif
-
 	/* configure logger for diagnostic logs */
 	el_oinit(&g_psmqd_log);
 	el_ooption(&g_psmqd_log, EL_LEVEL, g_psmqd_cfg.log_level);

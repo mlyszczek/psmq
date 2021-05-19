@@ -10,10 +10,6 @@
 
 struct psmqd_cfg
 {
-#if PSMQ_ENABLE_DAEMON
-    int             daemonize;
-#endif
-
     enum el_level   log_level;
     int             colorful_output;
     const char     *program_log;

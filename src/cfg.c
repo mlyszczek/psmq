@@ -112,9 +112,6 @@ static int cfg_parse_args
 	{
 		switch (arg)
 		{
-#if PSMQ_ENABLE_DAEMON
-		case 'd': g_psmqd_cfg.daemonize = 1; break;
-#endif
 		case 'c': g_psmqd_cfg.colorful_output = 1; break;
 		case 'l': PARSE_INT(log_level, 0, 7); break;
 		case 'p': g_psmqd_cfg.program_log = optarg; break;
@@ -134,9 +131,6 @@ static int cfg_parse_args
 					"\t-h           print this help and exit\n"
 					"\t-v           print version and exit\n"
 					"\t-c           enable nice colors for logs\n"
-#if PSMQ_ENABLE_DAEMON
-					"\t-d           run as daemon\n"
-#endif
 					"\t-l<level>    logging level 0-7\n"
 					"\t-p<path>     where logs will be stored (stdout if not specified)\n");
 			printf(
@@ -238,9 +232,6 @@ void psmqd_cfg_print(void)
 
 	el_oprint(OELN, PACKAGE_STRING);
 	el_oprint(OELN, "psmqd configuration");
-#if PSMQ_ENABLE_DAEMON
-	CONFIG_PRINT(daemonize, "%d");
-#endif
 	CONFIG_PRINT(log_level, "%d");
 	CONFIG_PRINT(colorful_output, "%d");
 	if (g_psmqd_cfg.program_log)
