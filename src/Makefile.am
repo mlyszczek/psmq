@@ -38,16 +38,16 @@ library_cflags = -DPSMQ_LIBRARY=1
 libpsmqd_la_SOURCES = $(psmqd_source) $(psmqs_source) $(psmqp_source)
 libpsmqd_la_CFLAGS = $(bin_cflags) $(library_cflags)
 libpsmqd_la_LDFLAGS = $(bin_ldflags) \
-		-version-info 9999:0:0
-#                 .------' | `---.
-#              current:revision:age
-#                 |        |     `- increment if interfaces have been added
-#                 |        |        set to zero if interfaces have been removed
-#                 |        |        or changed
-#                 |        `- increment if source code has changed
-#                 |           set to zero if current is incremented
-#                 `- increment if interfaces have been added, removed or changed
-
+		-version-info 2:0:2
+#		       .------' | `---.
+#		    current:revision:age
+#		       |        |     `- increment if interfaces have been added
+#		       |        |        set to zero if interfaces have been removed
+#		       |        |        or changed
+#		       |        `- increment if source code has changed
+#		       |           set to zero if current is incremented
+#		       `- increment if interfaces have been added, removed or changed
+#
 endif # ENABLE_LIBRARY
 
 # static code analyzer
