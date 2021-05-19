@@ -390,8 +390,8 @@ psmq_pub_missing_t_argument()
 psmq_pub_from_stdin()
 {
     start_psmqs
-    echo "test" | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1
-    mt_fail "psmq_grep "test.." \"${psmqs_stdout}\""
+    echo "t" | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1
+    mt_fail "psmq_grep "t.." \"${psmqs_stdout}\""
     stop_psmqs
 }
 psmq_pub_from_stdin_max_line()
@@ -439,9 +439,9 @@ psmq_pub_from_stdin_multi_line()
     # -3 since topic is 3 bytes long "/1\0";
     msg1="$(randstr $((psmq_msg_max - 3 - 2)) )"
     msg2="$(randstr $((psmq_msg_max - 3 - 2)) )"
-    msg3="$(randstr 2)"
+    msg3="$(randstr 1)"
     msg4="$(randstr $((psmq_msg_max - 3 - 2)) )"
-    msg5="$(randstr 2)"
+    msg5="$(randstr 1)"
 
     printf "%s\n%s\n%s\n%s\n%s\n" ${msg1} ${msg2} ${msg3} ${msg4} ${msg5} | \
         ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 2> ${psmqp_stderr}
@@ -465,7 +465,7 @@ psmq_pub_with_prio()
 psmq_pub_with_invalid_prio()
 {
     start_psmqs
-    ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -mtest -p7812364 \
+    ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -mt -p7812364 \
         2> ${psmqp_stderr}
     mt_fail "psmq_grep \"f/failed to publish, invalid prio 7812364\" \
         \"${psmqp_stderr}\""
@@ -474,10 +474,10 @@ psmq_pub_with_invalid_prio()
 psmq_pub_from_stdin_with_prio()
 {
     start_psmqs
-    echo test | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2
-    mt_fail "psmq_grep \"topic: /1, priority: 2, paylen: 6, payload\" \
+    echo t | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2
+    mt_fail "psmq_grep \"topic: /1, priority: 2, paylen: 3, payload\" \
         \"${psmqs_stdout}\""
-    mt_fail "psmq_grep \"test.\" \"${psmqs_stdout}\""
+    mt_fail "psmq_grep \"t..\" \"${psmqs_stdout}\""
     stop_psmqs
 }
 psmq_pub_empty_message()
@@ -551,7 +551,7 @@ psmq_pub_binary_many_split()
 psmq_pub_from_stdin_with_invalid_prio()
 {
     start_psmqs
-    echo test | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p7812364 \
+    echo t | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p7812364 \
         2> ${psmqp_stderr}
     mt_fail "psmq_grep \"f/failed to publish, invalid prio 7812364\" \
         \"${psmqp_stderr}\""

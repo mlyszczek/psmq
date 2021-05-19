@@ -667,7 +667,7 @@ static void psmqd_detect_dead_client(void)
 	struct psmq      sub_psmq;
 	struct psmq_msg  msg;
 	struct timespec  tp;
-	int              i;
+	char             i;
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -712,6 +712,7 @@ static void psmqd_detect_dead_client(void)
 /* ==========================================================================
    ========================================================================== */
 
+#if PSMQ_MSG_MAX > 5
 
 static void psmqd_multi_pub_sub(void *arg)
 {
@@ -920,6 +921,7 @@ static void psmqd_multi_pub_sub(void *arg)
 	free(psmq_pub);
 }
 
+#endif
 
 /* ==========================================================================
    ========================================================================== */
@@ -1328,35 +1330,27 @@ void psmqd_test_group(void)
 	char             mps_name[64];
 	struct multi_ps  mps;
 
-#if PSMQ_MSG_MAX < 6
-	/* these tests may spawn a lot of mqueues, so to prevent
-	 * name clashes (and thus weird test failures), payload
-	 * must be big enough to create that much queues */
+#if PSMQ_MAX_CLIENTS < 5
 	num_pub_max = 0;
 	num_sub_max = 0;
-#else
-#   if PSMQ_MAX_CLIENTS < 5
-	num_pub_max = 0;
-	num_sub_max = 0;
-#   elif PSMQ_MAX_CLIENTS < 10
+#elif PSMQ_MAX_CLIENTS < 10
 	num_pub_max = 2;
 	num_sub_max = 3;
-#   elif PSMQ_MAX_CLIENTS < 19
+#elif PSMQ_MAX_CLIENTS < 19
 	num_pub_max = 3;
 	num_sub_max = 7;
-#   elif PSMQ_MAX_CLIENTS < 36
+#elif PSMQ_MAX_CLIENTS < 36
 	num_pub_max = 4;
 	num_sub_max = 15;
-#   elif PSMQ_MAX_CLIENTS < 69
+#elif PSMQ_MAX_CLIENTS < 69
 	num_pub_max = 5;
 	num_sub_max = 31;
-#   elif PSMQ_MAX_CLIENTS < 134
+#elif PSMQ_MAX_CLIENTS < 134
 	num_pub_max = 6;
 	num_sub_max = 63;
-#   else
+#else
 	num_pub_max = 7;
 	num_sub_max = 127;
-#   endif
 #endif
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 

@@ -18,33 +18,12 @@
  * psmq cannot properly work with different values that these or
  * internal types forbids some values to be bigger */
 
-/* psmq reserves 5 bytes in psmq_msg buffer for control
- * messages. Request control messages can take up to 7 bytes.
- * Format of request control message is "xNNN\0", where "x" is a
- * command, and "NNN" is a file descriptor of a client.  "N"
- * would be enough when there is less than 10 clients, but we
- * support up to 256 clients so to prevent any bugs, we force max
- * value here. Control topic must always end with null character.
- *
- * When broker sends back reply, topic is in format "x\0", so we
- * are well within 5 bytes reserved for request.
- */
-#define PSMQ_CTRL_LEN 7
-
 #if PSMQ_MAX_CLIENTS > (UCHAR_MAX - 1)
 	/* psmq uses unsigned char to hold, and transmit client's file
 	 * descriptors, so you cannot set max clients to be bigger than
 	 * what unsigned char can hold. -1 is because UCHAR_MAX is
 	 * reserved for errors. */
 #   error PSMQ_MAX_CLIENTS must not be bigger than (UCHAR_MAX - 1)
-#endif
-
-#define PSMQ_MAX_CLIENTS_HARD_MAX 999
-#if PSMQ_MAX_CLIENTS > PSMQ_MAX_CLIENTS_HARD_MAX
-	/* some systems might have char size 10bits or bigger, but even
-	 * then, we cannot go beyond 999 clients, which is 9bytes long
-	 * in string representation. */
-#   error PSMQ_MAX_CLIENTS must not be bigger than 999
 #endif
 
 #define PSMQ_MAX_CLIENTS_HARD_MIN 2

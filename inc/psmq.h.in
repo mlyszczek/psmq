@@ -50,7 +50,7 @@ struct psmq
 };
 
 /* broker and clients both use this structure to communicate with
- * each other. psmq will create single mqueue with size of this
+ * each other. psmqd will create single mqueue with size of this
  * structure and one for each connected client, so it's worth keeping
  * it as small as possible. */
 struct psmq_msg
@@ -65,7 +65,7 @@ struct psmq_msg
 		 * descriptor of a client, an id to identify which client
 		 * is performing request
 		 *
-		 * during reply from the broker it hold request result
+		 * during reply from the broker it holds request result
 		 * (0 for success or errno when error occured) */
 		unsigned char  data;
 	} ctrl;
@@ -78,7 +78,19 @@ struct psmq_msg
 	 * null-terminated after which payload follows. This allows
 	 * for some flexibility, ie if PSMQ_MSG_MAX was be 10, then
 	 * topic could be 3 bytes long and payload 7, but also
-	 * topic could take 9 bytes and payload only 1. */
+	 * topic could take 9 bytes and payload only 1.
+	 *
+	 * Minium value of PSMQ_MSG_MAX that makes sense is 4,
+	 * 2 characters for topic (which always starts with '/'),
+	 * null terminator for topic, and one byte of data. You
+	 * could live with 3 bytes, but that would make psmq to
+	 * be able to only send topics without any payload.
+	 *
+	 * timeout ioctl needs 3 bytes of data, thus increasing
+	 * minimum value of PSMQ_MSG_MAX to 6. You still manually
+	 * se this to lower value like 3, but you would get
+	 * errors and hangs when calling timeout ioctl, so it's
+	 * not recommended nor supported. */
 	char  data[PSMQ_MSG_MAX];
 };
 
