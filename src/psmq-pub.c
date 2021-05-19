@@ -34,6 +34,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+
+#if PSMQ_NO_SIGNALS == 0
+#include <signal.h>
+#endif
+
 #include "psmq-common.h"
 
 
@@ -45,6 +50,17 @@
  / .___//_/   /_/  |___/ \__,_/ \__/ \___/  /_/   \__,_//_/ /_/ \___//____/
 /_/
    ========================================================================== */
+
+
+/* ==========================================================================
+    Need this stub to handle SIGINT and SIGTERM
+   ========================================================================== */
+
+#if PSMQ_NO_SIGNALS == 0
+
+static void sigint_handler(int signo) { (void)signo; }
+
+#endif
 
 
 /* ==========================================================================
@@ -253,6 +269,21 @@ int psmq_pub_main
 	const char  *topic;        /* topic to send message to (-t parameter) */
 	struct psmq  psmq;         /* psmq object */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+#if PSMQ_NO_SIGNALS == 0
+	{
+		struct sigaction  sa;  /* signal action instructions */
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+		/* install signal handler to nicely exit program */
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_handler = sigint_handler;
+		sigaction(SIGINT, &sa, NULL);
+		sigaction(SIGTERM, &sa, NULL);
+	}
+#endif
 
 
 	broker_name = NULL;
