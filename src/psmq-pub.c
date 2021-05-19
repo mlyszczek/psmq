@@ -192,8 +192,8 @@ static void send_stdin_binary
 )
 {
 	unsigned int  topiclen;  /* length of topic string */
-	unsigned int  r;         /* value returned from read() */
-	unsigned char data[PSMQ_MSG_MAX];  /* single data packet read from stdin */
+	ssize_t       r;         /* value returned from read() */
+	char          data[PSMQ_MSG_MAX];  /* single data packet read from stdin */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
