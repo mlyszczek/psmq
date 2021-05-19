@@ -165,7 +165,7 @@ static void send_stdin
 		/* now we have full line in buffer, ship
 		 * it. -1 is just so publish don't send
 		 * newline character */
-		if (publish(psmq, topic, line, strlen(line) + 1, prio) != 0)
+		if (publish(psmq, topic, line, strlen(line) - 1, prio) != 0)
 			return;
 	}
 }
