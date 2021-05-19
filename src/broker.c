@@ -1033,7 +1033,7 @@ int psmqd_broker_start(void)
 		 * nullified and payload fits into buffer */
 
 		el_oprint(OELD, "got control message: %c", msg.ctrl.cmd);
-		el_opmemory(OELD, &msg, sizeof(msg));
+		el_opmemory(OELD, &msg, psmq_real_msg_size(msg));
 
 		switch (msg.ctrl.cmd)
 		{
