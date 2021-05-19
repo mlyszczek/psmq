@@ -2,7 +2,16 @@ lib_LTLIBRARIES = libpsmq.la
 
 libpsmq_la_SOURCES = psmq.c ../utils.c
 
-libpsmq_la_LDFLAGS = -version-info 1:0:1 $(COVERAGE_LDFLAGS)
+libpsmq_la_LDFLAGS = $(COVERAGE_LDFLAGS) \
+		-version-info 9999:0:0
+#                 .------' | `---.
+#              current:revision:age
+#                 |        |     `- increment if interfaces have been added
+#                 |        |        set to zero if interfaces have been removed
+#                 |        |        or changed
+#                 |        `- increment if source code has changed
+#                 |           set to zero if current is incremented
+#                 `- increment if interfaces have been added, removed or changed
 libpsmq_la_CFLAGS = $(COVERAGE_CFLAGS) -I$(top_srcdir)/inc -I$(top_srcdir)
 
 # static code analyzer
