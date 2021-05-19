@@ -220,9 +220,12 @@ int psmq_sub_main
 				case ENOENT:
 					el_oprint(OELF, "broker %s doesn't exist", optarg);
 					break;
+
+				default:
+					el_operror(OELF, "psmq_init: unknown error: %d", errno);
+					break;
 				}
 
-				el_operror(OELF, "init: unknown");
 				return 1;
 			}
 			el_oprint(OELN, "connected to broker %s", optarg);
@@ -249,9 +252,12 @@ int psmq_sub_main
 					el_oprint(OELF,
 							"subscribe failed, topic %s is invalid", optarg);
 					break;
+
+				default:
+					el_operror(OELF, "subscribe: unknown error: %d", errno);
+					break;
 				}
 
-				el_operror(OELF, "subscribe: unknown");
 				psmq_cleanup(&psmq);
 				return 1;
 			}

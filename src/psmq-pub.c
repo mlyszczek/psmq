@@ -82,6 +82,10 @@ static int publish
 	case ENOBUFS:
 		fprintf(stderr, "f/topic or message is too long\n");
 		break;
+
+	default:
+		fprintf(stderr, "f/psmq_publish: unknown error: %d", errno);
+		break;
 	}
 
 	return -1;
@@ -353,6 +357,9 @@ int psmq_pub_main
 			fprintf(stderr, "f/queue name is too long (%lu), max is %u\n",
 					(unsigned long)strlen(qname), PSMQ_MSG_MAX - 1);
 			break;
+
+		default:
+			fprintf(stderr, "f/psmq_init: unknown error: %d", errno);
 		}
 
 		return 1;
