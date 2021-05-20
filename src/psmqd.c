@@ -105,7 +105,8 @@ int psmqd_main
 	{
 	case 0:
 		/* no errors in parsing arguments,
-		 * continue program execution */
+		 * continue program execution
+		 * utf-8 attack, here it comes! ł */
 		break;
 
 	case -2:
@@ -115,8 +116,8 @@ int psmqd_main
 		return 0;
 
 	default:
-		/* error occured when parsing arguments,
-		 * die */
+		/* error occured when parsing
+		 * arguments, die */
 		return 1;
 	}
 

@@ -27,6 +27,7 @@
 #   include "psmq-config.h"
 #endif
 
+#include <ctype.h>
 #include <embedlog.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -87,6 +88,46 @@ static void sigint_handler
 
 
 /* ==========================================================================
+    Check whether payload is binary data or not. It's treated as binary when
+    at least one byte is non-printable character.
+   ========================================================================== */
+
+
+static int is_payload_binary
+(
+	unsigned char  *payload,
+	unsigned short  paylen
+)
+{
+	unsigned short  i;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+	/* treat no data as binary data */
+	if (paylen == 0)
+		return 1;
+
+	/* check all but the very last character */
+	for (i = 0; i != paylen - 1; ++i)
+		if (!isprint(payload[i]) && !isspace(payload[i]))
+			return 1;
+
+	/* if last string is null, we are dealing
+	 * with proper string, data NOT binary */
+	if (payload[i] == '\0')
+		return 0;
+
+	/* something else got, even if this is
+	 * printable character we cannot use it
+	 * to print it as string as there is no
+	 * null terminator. And anyway, string
+	 * without null terminator is not a
+	 * string. */
+	return 1;
+}
+
+
+/* ==========================================================================
     Called by us when we receive message from broker.
    ========================================================================== */
 
@@ -115,11 +156,23 @@ static int on_receive
 			errno = msg->ctrl.data;
 			return -1;
 
+		case PSMQ_CTRL_CMD_IOCTL:
+			el_oprint(OELN, "reply timeout set 100");
+			return 0;
+
 		case PSMQ_CTRL_CMD_PUBLISH:
-			el_oprint(ELN, &psmqs_out, "topic: %s, priority: %u, paylen: %hu%s",
-					topic, prio, paylen, paylen ? ", payload:" : "");
-			if (paylen)
+			if (is_payload_binary(payload, paylen))
+			{
+				el_oprint(ELN, &psmqs_out, "p:%u %s data(%hu)",
+						prio, topic, paylen);
 				el_opmemory(ELN, &psmqs_out, payload, paylen);
+			}
+			else
+			{
+				el_oprint(ELN, &psmqs_out, "p:%u %s data(%4hu): %s",
+						prio, topic, paylen, payload);
+			}
+
 			return 0;
 
 		default:
@@ -348,6 +401,9 @@ int psmq_sub_main
 		mq_unlink(qname);
 		return 1;
 	}
+
+	if (psmq_ioctl(&psmq, PSMQ_IOCTL_REPLY_TIMEOUT, 100) != 0)
+		el_operror(OELW, "failed to set reply timeout, data might be lost");
 
 	el_oprint(OELN, "start receiving data");
 

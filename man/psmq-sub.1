@@ -66,6 +66,63 @@ to a file, where logs from incoming messages shall be stored.
 If file cannot be opened, program will refuse to start.
 Optional argument, if not passed, messages will be printed to
 .BR stdout .
+.PP
+Data will be printed in two ways depending on type of data received.
+When received data is simple ascii string, payload will be printed
+in the same line as info, thus one line per received message will
+be received.
+When data contains
+.B non-printable
+character, output will be hexdump like.
+.PP
+Line is printed in format:
+.br
+.BI p: n
+.I topic
+.BI data( llll ): payload
+.TP
+.BI p: n
+is a priority number
+.TP
+.I topic
+is a topic message was published on
+.TP
+.BI ( llll )
+number of bytes in payload
+.TP
+.I payload
+received payload
+.PP
+Check following example to better understand the format.
+Output is a snippet from a source code, sixth line is printed in binary
+since it contains utf8 character which encoding contain non-printable
+charater.
+Rest of lines are printed in single line as a string.
+.PP
+.nf
+    p:0 /source data(  37):     switch (psmqd_cfg_init(argc, argv))
+    p:0 /source data(   3):     {
+    p:0 /source data(   9):     case 0:
+    p:0 /source data(  37):             /* no errors in parsing arguments,
+    p:0 /source data(  32):              * continue program execution
+    p:0 /source data(40)
+    0x0000  09 09 20 2a 20 75 74 66 2d 38 20 61 74 74 61 63  .. * utf-8 attac
+    0x0010  6b 2c 20 68 65 72 65 20 69 74 20 63 6f 6d 65 73  k, here it comes
+    0x0020  21 20 c5 82 20 2a 2f 00                          ! .. */.
+    p:0 /source data(   9):             break;
+    p:0 /source data(   1):
+    p:0 /source data(  10):     case -2:
+    p:0 /source data(  10):     case -3:
+    p:0 /source data(  39):             /* help or version was printed, exit
+    p:0 /source data(  30):              * program without error */
+    p:0 /source data(  12):             return 0;
+    p:0 /source data(   1):
+    p:0 /source data(  10):     default:
+    p:0 /source data(  32):             /* error occured when parsing
+    p:0 /source data(  23):              * arguments, die */
+    p:0 /source data(  12):             return 1;
+    p:0 /source data(   3):     }
+fi
 .SH EXAMPLES
 .TP
 Listen to single topic

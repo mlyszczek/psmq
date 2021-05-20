@@ -123,6 +123,7 @@ static void send_stdin
 {
 	unsigned int  topiclen;  /* length of topic string */
 	unsigned int  linemax;   /* max allowed length of line buf */
+	unsigned int  paylen;    /* length of payload to send */
 	char          line[PSMQ_MSG_MAX];  /* single line read from stdin */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -178,10 +179,12 @@ static void send_stdin
 			return;
 		}
 
-		/* now we have full line in buffer, ship
-		 * it. -1 is just so publish don't send
-		 * newline character */
-		if (publish(psmq, topic, line, strlen(line) - 1, prio) != 0)
+		/* now we have full line in buffer, ship it. */
+		paylen = strlen(line);
+		/* remove new line character from string */
+		line[paylen - 1] = '\0';
+		/* send valid string with null terminator */
+		if (publish(psmq, topic, line, paylen, prio) != 0)
 			return;
 	}
 }
