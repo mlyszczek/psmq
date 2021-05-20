@@ -56,6 +56,9 @@ Unsubscribe confirmation has been received.
 .TP
 .B PSMQ_CTRL_CMD_CLOSE
 Broker closed connection with the client.
+.TP
+.B PSMQ_CTRL_CMD_IOCTL
+Response from the broker for ioctl request.
 .PP
 .IR ctrl . data
 is a response status of received message.
@@ -95,6 +98,19 @@ is only valid when
 is bigger than 0, otherwise you risk getting
 .B SIGSEGV
 from OS.
+.PP
+When
+.IR ctrl . data
+is
+.B PSMQ_CTRL_CMD_IOCTL
+then
+.I data
+will not contain topic but first byte will be ioctl request number
+and all of the following bytes are ioctl specific.
+In general all of reponses from ioctl will require custom parsing.
+Check
+.BR psmq_ioctl (3)
+for all possible ioctls.
 .PP
 .I paylen
 Length of payload part in

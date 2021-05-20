@@ -1,0 +1,134 @@
+.TH "psmq_ioctl_reply_timeout" "3" "19 May 2021 (v0.2.0)" "bofc.pl"
+.SH NAME
+.PP
+.B psmq_ioctl_reply_timeout
+- Sets time in ms, how long broker will wait for
+.I psmq
+queue until it starts dropping messages in case queue is full.
+.SH SYNOPSIS
+.PP
+.BI "#include <psmq.h>"
+.PP
+.BI "int psmq_ioctl_reply_timeout(struct psmq *" psmq ", unsigned short " val ")"
+.SH DESCRIPTION
+.PP
+When clients queue is full and broker is about to put a message on it, such
+message will be dropped immediately without hesitation.
+If you expect that incoming data will be received faster than you can
+process it, you can set how long broker shall wait for you to free up
+space on your queue.
+This time is specified in milliseconds.
+.PP
+Be advised though!
+If you set this to high value, broker will be stuck waiting for your client,
+other messages will not be processed by broker util it can deliver message
+for you!
+This can lead to situations where other clients won't be able to send data
+to broker as its queue can get full too when messages are not being processed.
+.SH "BROKER RESPONSE"
+.PP
+Response frame is
+.PP
+.nf
+    0     1         3
+    +-----+---------+
+    | req | timeout |
+    +-----+---------+
+.fi
+.TP
+.I req
+This will always be
+.BR PSMQ_CTRL_CMD_IOCTL .
+.TP
+.I timeout
+timeout set in broker stored as unsigned short.
+.SH "RETURN VALUE"
+.PP
+Library function will return 0 on success and -1 on errors.
+On broker side this ioctl cannot fail,
+msg.data[0] will have PSMQ_IOCTL_REPLY_TIMEOUT value and
+msg.data[1:2] will contain set timeout.
+.SH ERRORS
+.TP
+.B EINVAL
+.I psmq
+is
+.B NULL
+or
+.I val
+is bigger than 65535.
+.TP
+.B EBADF
+.I psmq
+has not yet been initialized
+.SH EXAMPLE
+Set reply timeout.
+.PP
+.nf
+    #include <psmq.h>
+
+    static int on_receive(struct psmq_msg *msg, char *topic,
+            unsigned char *payload, unsigned short paylen)
+    {
+        unsigned short timeout;
+
+        switch (msg->ctrl.cmd)
+        {
+        case PSMQ_CTRL_CMD_IOCTL:
+            /* payload[0] contains IOCTL number used in request,
+             * so you can perform different actions depending
+             * on response for different IOCTL */
+            switch (payload[0])
+            {
+            case PSMQ_IOCTL_REPLY_TIMEOUT:
+                memcpy(&timeout, payload + 1, sizeof(timeout));
+                fprintf(stder, "timeout set to %hu\\n", timeout);
+                return 0;
+            }
+        }
+    }
+
+    int main(void)
+    {
+        struct psmq psmq;
+        struct psmq_msg msg;
+
+        /* initialize psmq object that will create /sub mqueue for
+         * receiving data, and will connect to broker of name /brok.
+         * Max items in queue is set to 10 */
+        psmq_init(&psmq, "/brok", "/sub", 10);
+
+        /* set reply timeout with psmq_ioctl() function */
+        psmq_ioctl(&psmq, PSMQ_IOCTL_REPLY_TIMEOUT, 100);
+
+        /* every ioctl can also be called with dedicated function */
+        /* psmq_ioctl_reply_timeout(&psmq, 100); */
+
+        /* we will receive reply from broker for each ioctl sent */
+        psmq_receive(&psmq, &msg, NULL);
+        on_receive(&msg, PSMQ_TOPIC(msg), PSMQ_PAYLOAD(msg), msg.paylen);
+
+        /* after work is finished, we need to deregister from broker to
+         * make space in broker for another client */
+        psmq_cleanup(&psmq);
+        return 0;
+    }
+.fi
+.SH "BUG REPORTING"
+.PP
+Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).
