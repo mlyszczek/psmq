@@ -27,7 +27,8 @@ enum PSMQ_IOCTL
 #endif
 
 #define PSMQ_TOPIC(p) ((p).data)
-#define PSMQ_PAYLOAD(p) ((void *)((p).data + strlen((p).data) + 1))
+#define PSMQ_PAYLOAD(p) ((void *)((p).ctrl.cmd == PSMQ_CTRL_CMD_IOCTL ? \
+			(p).data : (p).data + strlen((p).data) + 1))
 
 /* struct used to hold state for single psmq client */
 struct psmq
