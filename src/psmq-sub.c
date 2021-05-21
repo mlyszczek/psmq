@@ -141,6 +141,10 @@ static int on_receive
 	unsigned int      prio      /* message priority */
 )
 {
+	unsigned short    timeout;  /* timeout value from broker reply */
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
 	switch (msg->ctrl.cmd)
 	{
 		case PSMQ_CTRL_CMD_SUBSCRIBE:
@@ -157,7 +161,8 @@ static int on_receive
 			return -1;
 
 		case PSMQ_CTRL_CMD_IOCTL:
-			el_oprint(OELN, "reply timeout set 100");
+			memcpy(&timeout, payload + 1, sizeof(timeout));
+			el_oprint(OELN, "reply timeout set %hu", timeout);
 			return 0;
 
 		case PSMQ_CTRL_CMD_PUBLISH:
@@ -229,7 +234,6 @@ int psmq_sub_main
 	el_oinit(&psmqs_log);
 	el_oinit(&psmqs_out);
 	el_ooption(&psmqs_out, EL_OUT, EL_OUT_STDOUT);
-	el_ooption(&psmqs_out, EL_FILE_SYNC_EVERY, 0);
 	el_ooption(&psmqs_out, EL_TS, EL_TS_LONG);
 	el_ooption(&psmqs_out, EL_TS_TM, EL_TS_TM_REALTIME);
 	el_ooption(&psmqs_out, EL_PRINT_LEVEL, 0);
