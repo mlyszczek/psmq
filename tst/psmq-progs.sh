@@ -73,6 +73,10 @@ psmq_grep()
         # not found yet
         sleep 0.1
 
+        if [ $((i % 50)) -eq 0 ]; then
+            kill -s USR1 $psmqs_pid >/dev/null 2>&1
+        fi
+
         i=$((i + 1))
         if [ ${i} -eq 600 ]
         then

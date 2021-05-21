@@ -56,6 +56,7 @@
 static struct el psmqs_log;
 static struct el psmqs_out;
 static int run;
+static int flush;
 
 
 /* ==========================================================================
@@ -69,7 +70,7 @@ static int run;
 
 
 /* ==========================================================================
-    SIGINT and SIGTERM handles, sets run to 0, to stop app
+    Signal handler for all signals
    ========================================================================== */
 
 #if PSMQ_NO_SIGNALS == 0
@@ -81,7 +82,17 @@ static void sigint_handler
 {
 	(void)signo;
 
-	run = 0;
+	switch (signo)
+	{
+	case SIGUSR1:
+		flush = 1;
+		return;
+
+	case SIGTERM:
+	case SIGINT:
+		run = 0;
+		return;
+	}
 }
 
 #endif
@@ -227,6 +238,7 @@ int psmq_sub_main
 		sa.sa_handler = sigint_handler;
 		sigaction(SIGINT, &sa, NULL);
 		sigaction(SIGTERM, &sa, NULL);
+		sigaction(SIGUSR1, &sa, NULL);
 	}
 #endif
 
@@ -234,12 +246,14 @@ int psmq_sub_main
 	el_oinit(&psmqs_log);
 	el_oinit(&psmqs_out);
 	el_ooption(&psmqs_out, EL_OUT, EL_OUT_STDOUT);
+	el_ooption(&psmqs_out, EL_FILE_SYNC_EVERY, 0);
 	el_ooption(&psmqs_out, EL_TS, EL_TS_LONG);
 	el_ooption(&psmqs_out, EL_TS_TM, EL_TS_TM_REALTIME);
 	el_ooption(&psmqs_out, EL_PRINT_LEVEL, 0);
 
 	got_b = 0;
 	got_t = 0;
+	flush = 0;
 	run = 1;
 	qname = "/psmq-sub";
 	memset(&psmq, 0x00, sizeof(psmq));
@@ -346,6 +360,7 @@ int psmq_sub_main
 
 		case 'o':
 			el_ooption(&psmqs_out, EL_OUT, EL_OUT_FILE);
+			el_ooption(&psmqs_out, EL_FILE_SYNC_EVERY, 32767);
 
 			if (el_ooption(&psmqs_out, EL_FPATH, optarg) != 0)
 			{
@@ -420,6 +435,13 @@ int psmq_sub_main
 
 		if (psmq_receive(&psmq, &msg, &prio) != 0)
 		{
+			if (flush)
+			{
+				el_oflush(&psmqs_out);
+				flush = 0;
+				continue;
+			}
+
 			if (errno == EINTR)
 			{
 				el_oprint(OELN, "interrupt received, exit");
