@@ -10,9 +10,9 @@ distclean-local: pvs-clean
 
 .PHONY: pvs-clean
 pvs-clean:
-	$(RM) strace_out
-	$(RM) report.tasks
-	$(RM) pvs-studio.log
+	rm -f strace_out
+	rm -f report.tasks
+	rm -f pvs-studio.log
 
 
 EXTRA_DIST = tap-driver.sh psmq-common.h readme.md man2html.sh \
