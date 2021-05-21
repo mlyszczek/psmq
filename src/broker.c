@@ -654,8 +654,7 @@ static int psmqd_broker_close
             none        -       psmq doesn't use any id to identify messages
                                 so OK response to publishing client is quite
                                 pointless, as he wouldn't know which message
-                                has been accepted. Also we don't know who
-                                sent a message.
+                                has been accepted.
    ========================================================================== */
 
 
