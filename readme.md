@@ -16,16 +16,17 @@ ignored completely, it's just memory and safety comes first. Always.
 Why?
 ====
 
-Good, question. Why would you want to add more code, to your project, when you
-can do all this thing using ordinary queues - after all **psmq** is implemented on
-top of **mqueue**. Well, if you only communicate processes in 1:1 way, you won't
-find this library useful - it's easy enough to create 2 queues and send/receive
-from them. No, publish subscribe shines best when you need to communicate N:N
-processes. That is for example, you have process 1 that handles **CAN** hardware
-and reads battery level. Now couple of processes might be interested in battery
-level, so you simply publish that information on "/battery/level" topic and any
-other processes might subscribe to it and read it. Some examples who could be
-interested in such messages:
+Good, question. Why would you want to add more code, to your project, when
+you can do all these things using ordinary queues - after all **psmq** is
+implemented on top of **mqueue**. Well, if you only communicate processes in
+1:1 way, you won't find this library useful - it's easy enough to create 2
+queues and send/receive from them. No. Publish subscribe model shines best when
+you need to communicate N:N processes. That is for example, you have process1
+that handles hardware and reads battery level via **CAN**. Now couple of
+processes might be interested in battery level, so you simply publish that
+information on "/battery/level" topic and any other processes might
+subscribe to it and read it. Some examples who could be interested in such
+messages:
 
 * graphical user interface - for nice displaying battery status
 * engine control unit - to shut down engine to prevent battery damage
@@ -64,19 +65,18 @@ Dependencies
 All code follows **ANSI C** and **POSIX** standard (version 200112).
 External dependencies are:
 
-Broker only:
+Broker and psmq-sub:
 
 * [>=embedlog-0.6](https://embedlog.bofc.pl)
 * [=embedlog-0.4](https://embedlog.bofc.pl) (**psmq-0.1.0** only)
 
-Library is dependency free.
+Library and psmq-pub program are dependency free.
 
 Test results
 ============
 
-NOTE: these represent test results from **master** branch and may, from time to
-time, show failures. Tagged versions **always** pass all tests on all
-architectures. No exceptions.
+Library, broker and companion programs have been tested on following
+systems/machines.
 
 operating system tests
 ----------------------
@@ -124,6 +124,8 @@ Compiling and installing
 Instruction on how to compile, install and integrate are in
 [psmq_building](https://psmq.bofc.pl/manuals/psmq_building.7.html) manual
 page.
+
+For building on Unix it's classic "./configure && make install"
 
 Contact
 =======
