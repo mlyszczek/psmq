@@ -307,6 +307,7 @@ int psmq_timedreceive_ms
             ENOENT      mqname or brokername was just "/" and nothing else
             ENOMEM      not enough memory in the system
             ENOSPC      not enough space for the creation of a new queue
+            ETIMEDOUT   no response from broker for 30 seconds
    ========================================================================== */
 
 
@@ -386,7 +387,7 @@ int psmq_init
 
 
 		memset(&msg, 0x00, sizeof(msg));
-		if ((ack = psmq_receive(psmq, &msg, NULL)) == -1)
+		if ((ack = psmq_timedreceive_ms(psmq, &msg, NULL, 30000)) == -1)
 			break;
 
 		/* open response is suppose to send back
