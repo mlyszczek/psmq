@@ -32,8 +32,11 @@ will be automatically set to 0.
 .PP
 If broker's control mqueue is full then this function will block until broker
 deals with some messages and make place in the queue.
-Note that broker never blocks waiting for clients, so messages from mqueue are
-processed immediately and without unnecessary delays.
+Note that, by default, broker never blocks waiting for clients, so messages
+from mqueue are processed immediately and without unnecessary delays.
+Broker may block waiting for clients when you set high enough response timeout
+value via
+.BR psmq_ioctl_reply_timeout (3).
 .PP
 Successfull call means that message has been put into broker's queue with
 success it doesn't necessary mean that any client will receives that message.
@@ -56,9 +59,15 @@ share single buffer of size
 This means topic size + payload size cannot exceed that value.
 Note, that topic will take strlen(topic) + 1 size on buffer, since
 topic is string so it will also transmit null terminator char.
-This allows for some flexibility, as one message can contain large
+This allows for some flexibility, as one message can contain large topic
 (as in PSMQ_MSG_MAX - 1 large) and no payload, and next publish can
 be opposite - short topic but large payload.
+.PP
+Only real data is sent over mqueue, if
+.B PSMQ_MSG_MAX
+is large like 256 bytes, but topic + payload is 10 bytes long, only
+these 10 bytes will be actually copied over to the broker and clients,
+not full buffer (256 bytes).
 .SH "RETURN VALUE"
 .PP
 0 on success. -1 on errors with appropriate errno set.

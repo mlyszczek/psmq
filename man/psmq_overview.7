@@ -52,8 +52,8 @@ Some examples can be:
 .PP
 You can use any structure that best suits your needs.
 .PP
-While both publishers and subscribers can use full form of topics, subsribers
-can use
+While both publishers and subscribers can use full form of topics, 
+only subsribers can use
 .B wildcards
 to subscribe to multiple topics with one subscription.
 There are 2 wildards.
@@ -198,6 +198,7 @@ l	l.
 \fBpsmq_timedreceive_ms\fR(3)	as above but accepts [ms] instead of timespec
 \fBpsmq_subscribe\fR(3)	subscribe to given topic to receive data
 \fBpsmq_unsubscribe\fR(3)	unsubscribe from topic to not receive that data
+\fBpsmq_ioctl\fR(3)	alter how broker communicates with client
 .TE
 .SS PROGRAMS
 .PP
