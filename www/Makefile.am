@@ -6,6 +6,6 @@ www:
 	chmod a+rX out -R
 
 clean:
-	$(RM) downloads.html
-	$(RM) -r out
-	$(RM) -r manuals
+	rm -f downloads.html
+	rm -f -r out
+	rm -f -r manuals
