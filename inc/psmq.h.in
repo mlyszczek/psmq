@@ -22,9 +22,7 @@ enum PSMQ_IOCTL
 	PSMQ_IOCTL_MAX
 };
 
-#ifndef PSMQ_MSG_MAX
 #define PSMQ_MSG_MAX (@PSMQ_MSG_MAX@)
-#endif
 
 #define PSMQ_TOPIC(p) ((p).data)
 #define PSMQ_PAYLOAD(p) ((void *)((p).ctrl.cmd == PSMQ_CTRL_CMD_IOCTL ? \
