@@ -124,7 +124,6 @@ AS_IF([test $PSMQ_MAX_CLIENTS -lt 2],
 
 AC_ARG_VAR([PSMQ_MSG_MAX], [Maximum length of message (topic + payload)])
 AS_IF([test "x$PSMQ_MSG_MAX" = x], [PSMQ_MSG_MAX="255"])
-#AC_DEFINE_UNQUOTED([PSMQ_MSG_MAX], [$PSMQ_MSG_MAX], [Maximum length of message (topic + payload])
 
 # reason for this limit is documented in inc/psmq.h.in
 AS_IF([test $PSMQ_MSG_MAX -lt 6],
