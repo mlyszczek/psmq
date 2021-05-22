@@ -477,13 +477,13 @@ int psmq_cleanup
 	VALID(EBADF, psmq->qsub != psmq->qpub);
 
 	/* send close() to the broker, we don't care
-	 * if it succed or not, we close our booth and
+	 * if it succeded or not, we close our booth and
 	 * nothing can stop us from doing it */
 	psmq_publish_msg(psmq, PSMQ_CTRL_CMD_CLOSE, psmq->fd, NULL, NULL, 0, 0);
 	mq_close(psmq->qpub);
 	mq_close(psmq->qsub);
-	psmq->qpub = (mqd_t) -1;
-	psmq->qsub = (mqd_t) -1;
+	psmq->qpub = (mqd_t)-1;
+	psmq->qsub = (mqd_t)-1;
 	return 0;
 }
 
