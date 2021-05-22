@@ -43,9 +43,16 @@
  * will calculate number of bytes that are actual usefull and that
  * should be transfered over. Note: m argument, must be validated,
  * that is, data[] must have at least on null termination (topic)
- * or paylen must be 0 and data[0] = '\0'. */
+ * or paylen must be 0 and data[0] = '\0'.
+ *
+ * only exception from the rule is ioctl control message, since
+ * it does not transport topic but only custom binary data, we
+ * cannot run strlen() on this and simply use paylen as length
+ * of payload */
 #define psmq_real_msg_size(m) (sizeof((m).paylen) + sizeof((m).ctrl) + \
-		strlen((m).data) + 1 + (m).paylen)
+		((m).ctrl.cmd == PSMQ_CTRL_CMD_IOCTL ? 0 : (strlen((m).data) + 1)) + \
+		(m).paylen)
+
 
 void psmq_ms_to_tp(size_t ms, struct timespec *tp);
 
