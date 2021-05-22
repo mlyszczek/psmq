@@ -1,1 +1,1 @@
-include_HEADERS = psmq.h
+nodist_include_HEADERS = psmq.h
