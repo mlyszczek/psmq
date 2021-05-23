@@ -87,7 +87,7 @@ mv "debian/control.template" "debian/control"
 
 export CFLAGS="-g"
 #export LDFLAGS="-L/usr/bofc/lib"
-debuild -us -uc
+DEB_BUILD_OPTIONS=nocheck debuild -us -uc
 
 ###
 # unsed, so it these don't pollute gcc, when we built test program
