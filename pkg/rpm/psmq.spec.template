@@ -10,8 +10,8 @@ Source0:        https://git.bofc.pl/psmq/snapshot/psmq-%{version}.tar.gz
 Vendor:         Bits of Code
 Packager:       Michał Łyszczek <michal.lyszczek@bofc.pl>
 
-BuildRequires:  embedlog >= 0.5.0, automake autoconf libtool
-Requires:       embedlog >= 0.5.0
+BuildRequires:  embedlog >= 0.6.0, automake autoconf libtool
+Requires:       embedlog >= 0.6.0
 
 %description
 psmq is publish ssubscribe message queue. It's a set of programs and libraries
@@ -44,16 +44,8 @@ make %{?_smp_mflags}
 %install
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.a
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.la
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.so
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.so.0
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.so.0.1.1
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.a
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.la
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.so
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.so.0
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.so.0.1.1
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib64/libpsmqd.*
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -f $RPM_BUILD_ROOT/usr/lib/libpsmqd.*
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
