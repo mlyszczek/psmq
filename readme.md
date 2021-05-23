@@ -41,6 +41,10 @@ just send frame to broker and forget about it. Of course, you could do all of
 this in one process, or multiple threads that share such information easily, but
 it's poor design.
 
+Library overview with usage explanation can be found in
+[psmq_overview](https://psmq.bofc.pl/manuals/psmq_overview.7.html)(7)
+manual page.
+
 Documentation
 =============
 
@@ -81,7 +85,7 @@ systems/machines.
 operating system tests
 ----------------------
 
-* arm-cortex-m3-nuttx-7.28 (manual)
+* arm-cortex-m3-nuttx-10.1 (manual)
 * power4-polarhome-aix-7.1
 * i686-builder-freebsd-11.1
 * i686-builder-netbsd-8.0

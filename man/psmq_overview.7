@@ -16,6 +16,46 @@ message queues.
 This page shortly describes each component of the tool and more information
 about each component can be found on their own pages.
 .SH DESCRIPTION
+.SS LIBRARY USAGE
+.PP
+.nf
+/* only single header is needed */
+#include <psmq.h>
+
+int main(void)
+{
+    struct psmq  *psmq; /* psmq library object, passed to all psmq functions */
+    struct psmq_msg  msg; /* struct that holds received message from broker */
+
+    /* Library is very easy to use, at first you need to
+     * initialize library object and connect to the broker */
+    psmq_init(&psmq, "/broker-queue", "/our-queue", 10);
+
+    /* now you are ready publish messages */
+    psmq_publish(&psmq, "/topic", "data", strlen("data") + 1, 0);
+
+    /* if you want to receive messages you need to
+     * first subscribe to a topic */
+    psmq_subscribe(&psmq, "/engine/rpm");
+    /* you can subscribe to as many topics as you'd like */
+    psmq_subscribe(&psmq, "/wheel/speed");
+
+    /* now you can start receiving data */
+    psmq_receive(&psmq, &msg, NULL);
+
+    return 0;
+}
+.fi
+.PP
+And that's all about basic usage.
+You can use
+.B PSMQ_TOPIC
+and
+.B PSMQ_PAYLOAD
+macros to easily extract topic and payload from msg without knowing its
+internal structure.
+More on this with usage example can be found in
+.BR psmq_receive (3).
 .SS PUBLISH/SUBSCRIBE
 .PP
 The
