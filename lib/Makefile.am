@@ -3,7 +3,7 @@ lib_LTLIBRARIES = libpsmq.la
 libpsmq_la_SOURCES = psmq.c ../utils.c
 
 libpsmq_la_LDFLAGS = $(COVERAGE_LDFLAGS) \
-		-version-info 2:0:2
+		-version-info 2:1:2
 #		       .------' | `---.
 #		    current:revision:age
 #		       |        |     `- increment if interfaces have been added

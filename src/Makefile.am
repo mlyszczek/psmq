@@ -38,7 +38,7 @@ library_cflags = -DPSMQ_LIBRARY=1
 libpsmqd_la_SOURCES = $(psmqd_source) $(psmqs_source) $(psmqp_source)
 libpsmqd_la_CFLAGS = $(bin_cflags) $(library_cflags)
 libpsmqd_la_LDFLAGS = $(bin_ldflags) \
-		-version-info 2:0:2
+		-version-info 2:1:2
 #		       .------' | `---.
 #		    current:revision:age
 #		       |        |     `- increment if interfaces have been added
