@@ -125,7 +125,7 @@ start_psmqd()
 start_psmqs()
 {
     echo -n > "${psmqs_stdout}"
-    ${psmqs_bin} -n${psmqs_name} -b${broker_name} -t/1 -t/2 -o${psmqs_stdout} \
+    ${psmqs_bin} -n${psmqs_name} -b${broker_name} -t/1 -t/2 -t/3 -o${psmqs_stdout} \
         2> ${psmqs_stderr} &
     psmqs_pid=${!}
 
@@ -274,6 +274,7 @@ psmq_sub_invalid_topic()
     mt_fail "psmq_grep \"subscribe failed, topic / is invalid\" \
         \"${psmqs_stderr}\""
 }
+
 psmq_sub_missing_argument()
 {
     ${psmqs_bin} -b 2> ${psmqs_stderr}
@@ -304,6 +305,7 @@ psmq_sub_broker_go_down_before_client()
     # restart psmqd
     start_psmqd
 }
+
 psmq_pub_print_help()
 {
     ${psmqp_bin} -h > ${psmqp_stdout}
@@ -587,7 +589,14 @@ psmq_progs_simple_pub_sub()
     mt_fail "psmq_grep $(echo ${msg} | cut -c-16) \"${psmqs_stdout}\""
     stop_psmqs
 }
-
+psmq_sub_subscribe_message()
+{
+    start_psmqs
+    mt_fail "psmq_grep \"n/subscribed to: /1\" \"${psmqs_stderr}\""
+    mt_fail "psmq_grep \"n/subscribed to: /2\" \"${psmqs_stderr}\""
+    mt_fail "psmq_grep \"n/subscribed to: /3\" \"${psmqs_stderr}\""
+    stop_psmqs
+}
 
 ## ==========================================================================
 #                                             _
@@ -615,6 +624,7 @@ mt_run psmq_sub_unknown_argument
 mt_run psmq_sub_no_arguments
 mt_run psmq_sub_invalid_topic
 mt_run psmq_sub_broker_go_down_before_client
+mt_run psmq_sub_subscribe_message
 mt_run psmq_pub_print_help
 mt_run psmq_pub_print_version
 mt_run psmq_pub_broker_doesnt_exist
