@@ -1,0 +1,77 @@
+[2021-05-23 16:51:03][cfg.c:233] n/psmq 0.2.0
+[2021-05-23 16:51:03][cfg.c:234] n/psmqd configuration
+[2021-05-23 16:51:03][cfg.c:235] n/log_level...................: 6
+[2021-05-23 16:51:03][cfg.c:236] n/colorful_output.............: 0
+[2021-05-23 16:51:03][cfg.c:238] n/program_log.................: ./logson
+[2021-05-23 16:51:03][cfg.c:241] n/broker_name.................: /brok
+[2021-05-23 16:51:03][cfg.c:242] n/broker_maxmsg...............: 10
+[2021-05-23 16:51:03][cfg.c:243] n/remove_queue................: 0
+[2021-05-23 16:51:03][cfg.c:244] n/PSMQ_MSG_MAX................: 255
+[2021-05-23 16:51:03][cfg.c:245] n/sizeof(struct psmq_msg).....: 260
+[2021-05-23 16:51:03][broker.c:917] n/created queue /brok with msgsize 260 maxsize 10
+[2021-05-23 16:51:03][broker.c:933] n/starting psmqd broker main loop
+[2021-05-23 16:51:04][broker.c:951] n/shutdown flag was set, exit broker
+[2021-05-23 16:51:04][psmqd.c:159] n/exiting psmqd
+[2021-05-23 16:51:06][cfg.c:233] n/psmq 0.2.0
+[2021-05-23 16:51:06][cfg.c:234] n/psmqd configuration
+[2021-05-23 16:51:06][cfg.c:235] n/log_level...................: 6
+[2021-05-23 16:51:06][cfg.c:236] n/colorful_output.............: 0
+[2021-05-23 16:51:06][cfg.c:238] n/program_log.................: ./logson
+[2021-05-23 16:51:06][cfg.c:241] n/broker_name.................: /brok
+[2021-05-23 16:51:06][cfg.c:242] n/broker_maxmsg...............: 10
+[2021-05-23 16:51:06][cfg.c:243] n/remove_queue................: 0
+[2021-05-23 16:51:06][cfg.c:244] n/PSMQ_MSG_MAX................: 255
+[2021-05-23 16:51:06][cfg.c:245] n/sizeof(struct psmq_msg).....: 260
+[2021-05-23 16:51:06][broker.c:917] n/created queue /brok with msgsize 260 maxsize 10
+[2021-05-23 16:51:06][broker.c:933] n/starting psmqd broker main loop
+[2021-05-23 16:53:30][broker.c:433] n/[  0] opened /psmq-sub
+[2021-05-23 16:53:30][broker.c:540] n/[  0] subscribed to /as
+[2021-05-23 16:53:30][broker.c:836] n/[  0] ioctl: set reply_timeout to 100
+[2021-05-23 16:53:36][broker.c:634] n/[  0] closed, bye bye
+[2021-05-23 16:55:09][broker.c:951] n/shutdown flag was set, exit broker
+[2021-05-23 16:55:09][psmqd.c:159] n/exiting psmqd
+[2021-05-23 16:55:19][cfg.c:233] n/psmq 0.2.0
+[2021-05-23 16:55:19][cfg.c:234] n/psmqd configuration
+[2021-05-23 16:55:19][cfg.c:235] n/log_level...................: 6
+[2021-05-23 16:55:19][cfg.c:236] n/colorful_output.............: 0
+[2021-05-23 16:55:19][cfg.c:238] n/program_log.................: ./logson
+[2021-05-23 16:55:19][cfg.c:241] n/broker_name.................: /brok
+[2021-05-23 16:55:19][cfg.c:242] n/broker_maxmsg...............: 10
+[2021-05-23 16:55:19][cfg.c:243] n/remove_queue................: 0
+[2021-05-23 16:55:19][cfg.c:244] n/PSMQ_MSG_MAX................: 255
+[2021-05-23 16:55:19][cfg.c:245] n/sizeof(struct psmq_msg).....: 260
+[2021-05-23 16:55:19][broker.c:918] n/created queue /brok with msgsize 260 maxsize 10
+[2021-05-23 16:55:19][broker.c:934] n/starting psmqd broker main loop
+[2021-05-23 16:55:27][broker.c:433] n/[  0] opened /psmq-sub
+[2021-05-23 16:55:27][broker.c:541] n/[  0] subscribed to /as
+[2021-05-23 16:55:27][broker.c:837] n/[  0] ioctl: set reply_timeout to 100
+[2021-05-23 16:55:30][broker.c:952] n/shutdown flag was set, exit broker
+[2021-05-23 16:55:30][broker.c:635] n/[  0] closed, bye bye
+[2021-05-23 16:55:30][psmqd.c:159] n/exiting psmqd
+[2021-05-23 17:37:37][cfg.c:233] n/psmq 0.2.1
+[2021-05-23 17:37:37][cfg.c:234] n/psmqd configuration
+[2021-05-23 17:37:37][cfg.c:235] n/log_level...................: 6
+[2021-05-23 17:37:37][cfg.c:236] n/colorful_output.............: 0
+[2021-05-23 17:37:37][cfg.c:238] n/program_log.................: ./logson
+[2021-05-23 17:37:37][cfg.c:241] n/broker_name.................: /brok
+[2021-05-23 17:37:37][cfg.c:242] n/broker_maxmsg...............: 10
+[2021-05-23 17:37:37][cfg.c:243] n/remove_queue................: 0
+[2021-05-23 17:37:37][cfg.c:244] n/PSMQ_MSG_MAX................: 255
+[2021-05-23 17:37:37][cfg.c:245] n/sizeof(struct psmq_msg).....: 260
+[2021-05-23 17:37:37][broker.c:918] n/created queue /brok with msgsize 260 maxsize 10
+[2021-05-23 17:37:37][broker.c:934] n/starting psmqd broker main loop
+[2021-05-23 17:38:16][broker.c:434] n/[  0] opened /sub
+[2021-05-23 17:38:16][broker.c:541] n/[  0] subscribed to /can/*
+[2021-05-23 17:38:16][broker.c:541] n/[  0] subscribed to /adc/*
+[2021-05-23 17:38:16][broker.c:837] n/[  0] ioctl: set reply_timeout to 100
+[2021-05-23 17:38:42][broker.c:434] n/[  1] opened /psmq_pub
+[2021-05-23 17:38:42][broker.c:635] n/[  1] closed, bye bye
+[2021-05-23 17:38:59][broker.c:434] n/[  1] opened /psmq_pub
+[2021-05-23 17:38:59][broker.c:635] n/[  1] closed, bye bye
+[2021-05-23 17:39:09][broker.c:434] n/[  1] opened /psmq_pub
+[2021-05-23 17:39:09][broker.c:635] n/[  1] closed, bye bye
+[2021-05-23 17:39:22][broker.c:434] n/[  1] opened /psmq_pub
+[2021-05-23 17:39:22][broker.c:635] n/[  1] closed, bye bye
+[2021-05-23 17:46:05][broker.c:635] n/[  0] closed, bye bye
+[2021-05-23 17:46:06][broker.c:952] n/shutdown flag was set, exit broker
+[2021-05-23 17:46:06][psmqd.c:159] n/exiting psmqd
