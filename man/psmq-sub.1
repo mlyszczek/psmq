@@ -78,17 +78,18 @@ character, output will be hexdump like.
 Line is printed in format:
 .br
 .BI p: n
-.I topic
-.BI data( llll ): payload
+.BI l: llll
+.I \ topic
+.I \ payload
 .TP
 .BI p: n
 is a priority number
 .TP
+.BI l: llll
+number of bytes in payload, aligned to 4 numbers.
+.TP
 .I topic
 is a topic message was published on
-.TP
-.BI ( llll )
-number of bytes in payload
 .TP
 .I payload
 received payload
