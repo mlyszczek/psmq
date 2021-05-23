@@ -8,6 +8,7 @@ psmqd_test_SOURCES = $(psmqd_test_source) $(psmqd_test_header)
 psmqd_test_CFLAGS = -I$(top_srcdir)/inc \
 	-I$(top_srcdir)/src \
 	-I$(top_srcdir) \
+	-I$(top_builddir)/inc \
 	$(COVERAGE_CFLAGS)
 
 psmqd_test_LDFLAGS = $(COVERAGE_LDFLAGS) -static

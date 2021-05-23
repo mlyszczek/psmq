@@ -6,7 +6,7 @@ psmqp_source = psmq-pub.c
 psmq_headers = cfg.h broker.h globals.h topic-list.h $(top_srcdir)/valid.h \
 	$(top_srcdir)/psmq-common.h
 
-bin_cflags = $(COVERAGE_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/inc
+bin_cflags = $(COVERAGE_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/inc -I$(top_builddir)/inc
 bin_ldflags = $(COVERAGE_LDFLAGS)
 
 if ENABLE_STANDALONE

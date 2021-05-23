@@ -12,7 +12,8 @@ libpsmq_la_LDFLAGS = $(COVERAGE_LDFLAGS) \
 #                 |        `- increment if source code has changed
 #                 |           set to zero if current is incremented
 #                 `- increment if interfaces have been added, removed or changed
-libpsmq_la_CFLAGS = $(COVERAGE_CFLAGS) -I$(top_srcdir)/inc -I$(top_srcdir)
+libpsmq_la_CFLAGS = $(COVERAGE_CFLAGS) -I$(top_srcdir)/inc -I$(top_srcdir) \
+	-I$(top_builddir)/inc
 
 # static code analyzer
 
