@@ -158,14 +158,6 @@ static int on_receive
 
 	switch (msg->ctrl.cmd)
 	{
-		case PSMQ_CTRL_CMD_SUBSCRIBE:
-			errno = msg->ctrl.data;
-			if (msg->ctrl.data == 0)
-				el_oprint(OELN, "subscribed to %s", topic);
-			else
-				el_oprint(OELN, "subscribe error: %s", strerror(errno));
-			return msg->ctrl.data;
-
 		case PSMQ_CTRL_CMD_CLOSE:
 			el_oprint(OELN, "broker has closed the connection");
 			errno = msg->ctrl.data;
@@ -356,6 +348,7 @@ int psmq_sub_main
 				return 1;
 			}
 
+			el_oprint(OELN, "subscribed to: %s", msg.data);
 			break;
 
 		case 'o':
