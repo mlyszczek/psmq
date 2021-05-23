@@ -174,14 +174,14 @@ static int on_receive
 		case PSMQ_CTRL_CMD_PUBLISH:
 			if (is_payload_binary(payload, paylen))
 			{
-				el_oprint(ELN, &psmqs_out, "p:%u %s data(%hu)",
-						prio, topic, paylen);
+				el_oprint(ELN, &psmqs_out, "p:%u l:%4hu  %s",
+						prio, paylen, topic);
 				el_opmemory(ELN, &psmqs_out, payload, paylen);
 			}
 			else
 			{
-				el_oprint(ELN, &psmqs_out, "p:%u %s data(%4hu): %s",
-						prio, topic, paylen, payload);
+				el_oprint(ELN, &psmqs_out, "p:%u l:%4hu  %s  %s",
+						prio, paylen - 1, topic, payload);
 			}
 
 			return 0;

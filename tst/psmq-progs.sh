@@ -397,7 +397,8 @@ psmq_pub_from_stdin()
 {
     start_psmqs
     echo "t" | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1
-    mt_fail "psmq_grep \"2): t\" \"${psmqs_stdout}\""
+    psmq_grep "p:0 l:   1  /1" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
     stop_psmqs
 }
 psmq_pub_from_stdin_max_line()
@@ -463,8 +464,8 @@ psmq_pub_with_prio()
     start_psmqs
     msg="m"
     ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -m${msg} -p2
-    mt_fail "psmq_grep \"p:2 /1 data(\" \"${psmqs_stdout}\""
-    mt_fail "psmq_grep \"2): m\" \"${psmqs_stdout}\""
+    psmq_grep "p:2 l:   1  /1  m" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
     stop_psmqs
 }
 psmq_pub_with_invalid_prio()
@@ -480,16 +481,16 @@ psmq_pub_from_stdin_with_prio()
 {
     start_psmqs
     echo t | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2
-    mt_fail "psmq_grep \"p:2 /1 data(\" \"${psmqs_stdout}\""
-    mt_fail "psmq_grep \"2): t\" \"${psmqs_stdout}\""
+    psmq_grep "p:2 l:   1  /1  t" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
     stop_psmqs
 }
 psmq_pub_empty_message()
 {
     start_psmqs
     ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -e
-    mt_fail "psmq_grep \"p:2 /1 data(0)\" \
-        \"${psmqs_stdout}\""
+    psmq_grep "p:2 l:   0  /1" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
     stop_psmqs
 }
 psmq_pub_binary_single()
@@ -497,9 +498,11 @@ psmq_pub_binary_single()
     start_psmqs
     msg=$(mktemp)
     count=$((psmq_msg_max - 1 - 3))
-    dd if=/dev/urandom of=$msg bs=1 count=${count} 2>/dev/null
+    dd if=/dev/zero of=$msg bs=1 count=${count} 2>/dev/null
     cat $msg | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -B
-    mt_fail "psmq_grep \"p:2 /1 data($count)\" \"${psmqs_stdout}\""
+    cnt=$(printf "%4d" $count)
+    psmq_grep "p:2 l:$cnt  /1" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
     rm $msg
     stop_psmqs
 }
@@ -508,9 +511,11 @@ psmq_pub_binary_max()
     start_psmqs
     msg=$(mktemp)
     count=$((psmq_msg_max - 3))
-    dd if=/dev/urandom of=$msg bs=1 count=${count} 2>/dev/null
+    dd if=/dev/zero of=$msg bs=1 count=${count} 2>/dev/null
     cat $msg | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -B
-    mt_fail "psmq_grep \"p:2 /1 data($count)\" \"${psmqs_stdout}\""
+    cnt=$(printf "%4d" $count)
+    psmq_grep "p:2 l:$cnt  /1" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
     rm $msg
     stop_psmqs
 }
@@ -520,10 +525,13 @@ psmq_pub_binary_split()
     msg=$(mktemp)
     count=$((psmq_msg_max - 3 + 1))
     splt_count=$((count - 1))
-    dd if=/dev/urandom of=$msg bs=1 count=${count} 2>/dev/null
+    dd if=/dev/zero of=$msg bs=1 count=${count} 2>/dev/null
     cat $msg | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -B
-    mt_fail "psmq_grep \"p:2 /1 data($splt_count)\" \"${psmqs_stdout}\""
-    mt_fail "psmq_grep \"p:2 /1 data(1)\" \"${psmqs_stdout}\""
+    cnt=$(printf "%4d" $splt_count)
+    psmq_grep "p:2 l:$cnt  /1" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
+    psmq_grep "p:2 l:   1  /1" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
     rm $msg
     stop_psmqs
 }
@@ -534,13 +542,15 @@ psmq_pub_binary_many_split()
     # 4 full messages + one splitted byte
     count=$((4 * (psmq_msg_max - 3) + 1))
     splt_count=$((psmq_msg_max - 3))
-    dd if=/dev/urandom of=$msg bs=1 count=${count} 2>/dev/null
+    dd if=/dev/zero of=$msg bs=1 count=${count} 2>/dev/null
     cat $msg | ${psmqp_bin} -n${psmqp_name} -b${broker_name} -t/1 -p2 -B
     # first check for last split, this will make sure that previous
     # splits are in a log file as well
-    mt_fail "psmq_grep \"p:2 /1 data(1)\" \"${psmqs_stdout}\""
+    psmq_grep "p:2 l:   1  /1" $psmqs_stdout
+    mt_fail "[ $? -eq 0 ]"
     # now do custom grep and check if we have 4 full splits
-    split_count=$(grep "p:2 /1 data($splt_count)" $psmqs_stdout | wc -l)
+    cnt=$(printf "%4d" $splt_count)
+    split_count=$(grep "p:2 l:$cnt  /1" $psmqs_stdout | wc -l)
     mt_fail "[ $split_count -eq 4 ]"
     rm $msg
     stop_psmqs
