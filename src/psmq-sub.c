@@ -114,8 +114,11 @@ static int is_payload_binary
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	/* treat no data as binary data */
-	if (paylen == 0)
+	/* treat no data as binary data,
+	 * paylen == 1 could be '\0' but
+	 * we cannot treat is as text with
+	 * 100% certainty */
+	if (paylen == 0 || paylen == 1)
 		return 1;
 
 	/* check all but the very last character */
