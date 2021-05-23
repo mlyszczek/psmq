@@ -535,7 +535,6 @@ static int psmqd_broker_subscribe
 		return -1;
 	}
 
-	err = 0;
 	psmqd_broker_reply_ctrl(fd, PSMQ_CTRL_CMD_SUBSCRIBE, 0, stopic);
 	el_oprint(OELN, "[%3d] subscribed to %s", fd, stopic);
 	return 0;
