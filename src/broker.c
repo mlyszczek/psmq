@@ -913,7 +913,7 @@ int psmqd_broker_init(void)
 	if (i == 11)
 		return -1;
 
-	el_oprint(OELN, "created queue %s with msgsize %d maxsize %d",
+	el_oprint(OELN, "created queue %s with msgsize %ld maxsize %ld",
 			g_psmqd_cfg.broker_name, mqa.mq_msgsize, mqa.mq_maxmsg);
 	return 0;
 }
