@@ -1,0 +1,4 @@
+name: psmq
+build:
+  cmake: .
+  kconfig: zephyr/Kconfig
