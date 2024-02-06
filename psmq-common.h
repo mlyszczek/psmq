@@ -3,8 +3,8 @@
     Author: Michał Łyszczek <michal.lyszczek@bofc.pl>
    ========================================================================== */
 
-#ifndef PSMQ_BROKER_H
-#define PSMQ_BROKER_H 1
+#ifndef PSMQ_COMMON_H
+#define PSMQ_COMMON_H 1
 
 #ifdef HAVE_CONFIG_H
 #   include "psmq-config.h"
