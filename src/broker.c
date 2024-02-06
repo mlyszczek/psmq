@@ -1022,7 +1022,8 @@ int psmqd_broker_start(void)
 			 * We cannot send back error to the client
 			 * since we do not have proper fd, so only
 			 * log the warning. */
-			el_oprint(OELW, "msg with invalid fd (%d) received, hexdump is:");
+			el_oprint(OELW, "msg with invalid fd (%d) received, hexdump is:",
+					msg.ctrl.data);
 			el_opmemory(OELW, &msg, sizeof(msg));
 			continue;
 		}
