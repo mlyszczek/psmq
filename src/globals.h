@@ -6,11 +6,15 @@
 #ifndef PSMQ_GLOBALS_H
 #define PSMQ_GLOBALS_H 1
 
-#include <embedlog.h>
+#if PSMQ_HAVE_EMBEDLOG
+#  include <embedlog.h>
+#endif
 #include "cfg.h"
 
-extern struct psmqd_cfg   g_psmqd_cfg;
+#if PSMQ_HAVE_EMBEDLOG
 extern struct el          g_psmqd_log;
+#endif
+extern struct psmqd_cfg   g_psmqd_cfg;
 extern int                g_psmqd_shutdown;
 
 #endif /* PSMQ_GLOBALS_H */

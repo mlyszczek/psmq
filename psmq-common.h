@@ -10,10 +10,15 @@
 #   include "psmq-config.h"
 #endif
 
+#if PSMQ_HAVE_EMBEDLOG
+#  include <embedlog.h>
+#else
+#  include "embedlog-mock.h"
+#endif
+
 #include <limits.h>
 #include <stddef.h>
 #include <sys/time.h>
-
 /* hard limits, these are minimal values that either makes sense or
  * psmq cannot properly work with different values that these or
  * internal types forbids some values to be bigger */

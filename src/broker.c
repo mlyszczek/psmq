@@ -39,7 +39,6 @@
 #endif
 
 #include <assert.h>
-#include <embedlog.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>

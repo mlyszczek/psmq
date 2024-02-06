@@ -28,7 +28,6 @@
 #endif
 
 #include <ctype.h>
-#include <embedlog.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,9 +51,11 @@
    ========================================================================== */
 
 
-#define EL_OPTIONS_OBJECT &psmqs_log
+#if PSMQ_HAVE_EMBEDLOG
+#  define EL_OPTIONS_OBJECT &psmqs_log
 static struct el psmqs_log;
 static struct el psmqs_out;
+#endif
 static int run;
 static int flush;
 
@@ -174,20 +175,29 @@ static int on_receive
 		case PSMQ_CTRL_CMD_PUBLISH:
 			if (is_payload_binary(payload, paylen))
 			{
+#if PSMQ_HAVE_EMBEDLOG
 				el_oprint(ELN, &psmqs_out, "p:%u l:%4hu  %s",
 						prio, paylen, topic);
 				el_opmemory(ELN, &psmqs_out, payload, paylen);
+#else
+				printf("p:%u l:%4hu  %s\n", prio, paylen, topic);
+#endif
 			}
 			else
 			{
+#if PSMQ_HAVE_EMBEDLOG
 				el_oprint(ELN, &psmqs_out, "p:%u l:%4hu  %s  %s",
 						prio, paylen - 1, topic, payload);
+#else
+				printf("p:%u l:%4hu  %s  %s\n",
+						prio, paylen - 1, topic, payload);
+#endif
 			}
 
 			return 0;
 
 		default:
-			el_oprint(ELE, &psmqs_out, "Unknown cmd received: %c(%02x)",
+			el_oprint(OELE, "Unknown cmd received: %c(%02x)",
 					msg->ctrl.cmd, msg->ctrl.cmd);
 			return -1;
 	}
@@ -355,6 +365,7 @@ int psmq_sub_main
 			break;
 
 		case 'o':
+#if PSMQ_HAVE_EMBEDLOG
 			el_ooption(&psmqs_out, EL_OUT, EL_OUT_FILE);
 			el_ooption(&psmqs_out, EL_FILE_SYNC_EVERY, 32767);
 
@@ -364,6 +375,9 @@ int psmq_sub_main
 				psmq_cleanup(&psmq);
 				return 1;
 			}
+#else
+			fprintf(stderr, "WARNING: Logging to file requires embedlog\n");
+#endif
 
 			break;
 

@@ -6,13 +6,15 @@
 #ifndef PSMQ_PSMQD_CFG_H
 #define PSMQ_PSMQD_CFG_H 1
 
-#include <embedlog.h>
+#include "psmq-common.h"
 
 struct psmqd_cfg
 {
+#if PSMQ_HAVE_EMBEDLOG
     enum el_level   log_level;
     int             colorful_output;
     const char     *program_log;
+#endif
     const char     *broker_name;
     int             broker_maxmsg;
     int             remove_queue;

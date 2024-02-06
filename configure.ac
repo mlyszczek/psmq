@@ -34,6 +34,13 @@ AC_CONFIG_FILES(inc/psmq.h)
 # remember? This is mainly for embedded which may not implement POSIX at all.
 # But if programs are build with autotools, we can be fairy sure it has signals.
 AC_DEFINE_UNQUOTED([PSMQ_NO_SIGNALS], [0], [Disable signals handling])
+# embedlog is not strictly neccessary for this library to work, it allows for
+# logging to file and pretty print of logs. While additional library is not
+# a problem on Linux and other Unices it may be a problem on embedded systems,
+# that do not want to waste additional resources on something they don't need.
+# When using autotools, we force embedlog because it's not a problem, and
+# this can be defined to 0 on embedded.
+AC_DEFINE_UNQUOTED([PSMQ_HAVE_EMBEDLOG], [1], [Disable or enable embedlog logging])
 
 ###
 # solaris has some serious design problem, since we enabled POSIX

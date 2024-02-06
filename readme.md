@@ -67,14 +67,17 @@ Dependencies
 ============
 
 All code follows **ANSI C** and **POSIX** standard (version 200112).
-External dependencies are:
+Project has no hard dependencies. The only optional dependency is
+**embedlog** which enables more detailed debug logs (like, log location)
+and alows for easy logging onto file or other facilities. Without
+**embedlog** logs are still available but are only printed to stderr
+using stdio.
 
-Broker and psmq-sub:
+Broker and psmq-sub optionally can support embedlog library for
+enhanced logging.
 
 * [>=embedlog-0.6](https://embedlog.bofc.pl)
 * [=embedlog-0.4](https://embedlog.bofc.pl) (**psmq-0.1.0** only)
-
-Library and psmq-pub program are dependency free.
 
 Test results
 ============
@@ -85,24 +88,13 @@ systems/machines.
 operating system tests
 ----------------------
 
-* arm-cortex-m3-nuttx-10.1 (manual)
-* power4-polarhome-aix-7.1
-* i686-builder-freebsd-11.1
-* i686-builder-netbsd-8.0
-* x86_64-builder-solaris-11.3
-* i686-builder-linux-gnu-4.9
-* i686-builder-linux-musl-4.9
-* i686-builder-linux-uclibc-4.9
-* x86_64-builder-linux-gnu-4.9
-* x86_64-builder-linux-musl-4.9
-* x86_64-builder-linux-uclibc-4.9
-* x86_64-bofc-debian-9
-* x86_64-bofc-centos-7
-* x86_64-bofc-fedora-28
-* x86_64-bofc-opensuse-15
-* x86_64-bofc-rhel-7
-* x86_64-bofc-slackware-14.2
-* x86_64-bofc-ubuntu-18.04
+* nuttx
+* aix
+* hpux
+* freebsd
+* netbsd
+* solaris
+* linux
 
 machine tests
 -------------

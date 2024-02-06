@@ -11,7 +11,9 @@
    ========================================================================== */
 
 
-#include <embedlog.h>
+#if PSMQ_HAVE_EMBEDLOG
+#  include <embedlog.h>
+#endif
 #include "cfg.h"
 
 
@@ -26,5 +28,7 @@
 
 
 struct psmqd_cfg   g_psmqd_cfg;       /* program cfguration */
-struct el          g_psmqd_log;       /* options for embedlog to print logs */
 int                g_psmqd_shutdown;  /* when set program will stop and exit */
+#if PSMQ_HAVE_EMBEDLOG
+struct el          g_psmqd_log;       /* options for embedlog to print logs */
+#endif

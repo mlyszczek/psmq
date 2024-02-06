@@ -4,7 +4,7 @@ psmqd_source = cfg.c globals.c psmqd.c broker.c topic-list.c utils.c
 psmqs_source = psmq-sub.c
 psmqp_source = psmq-pub.c
 psmq_headers = cfg.h broker.h globals.h topic-list.h $(top_srcdir)/valid.h \
-	$(top_srcdir)/psmq-common.h
+	$(top_srcdir)/psmq-common.h $(top_srcdir)/embedlog-mock.h
 
 bin_cflags = $(COVERAGE_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/inc -I$(top_builddir)/inc
 bin_ldflags = $(COVERAGE_LDFLAGS)

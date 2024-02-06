@@ -30,7 +30,6 @@
 #   include "psmq-config.h"
 #endif
 
-#include <embedlog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,9 +111,11 @@ static int cfg_parse_args
 	{
 		switch (arg)
 		{
+#if PSMQ_HAVE_EMBEDLOG
 		case 'c': g_psmqd_cfg.colorful_output = 1; break;
 		case 'l': PARSE_INT(log_level, 0, 7); break;
 		case 'p': g_psmqd_cfg.program_log = optarg; break;
+#endif
 
 		case 'm': PARSE_INT(broker_maxmsg, 0, INT_MAX); break;
 		case 'b': g_psmqd_cfg.broker_name = optarg; break;
@@ -129,15 +130,19 @@ static int cfg_parse_args
 			printf(
 					"options:\n"
 					"\t-h           print this help and exit\n"
-					"\t-v           print version and exit\n"
+					"\t-v           print version and exit\n");
+#if PSMQ_HAVE_EMBEDLOG
+			printf(
 					"\t-c           enable nice colors for logs\n"
 					"\t-l<level>    logging level 0-7\n"
 					"\t-p<path>     where logs will be stored (stdout if not specified)\n");
+#endif
 			printf(
 					"\t-b<name>     name for broker control queue\n"
 					"\t-r           if set, control queue will be removed before starting\n"
 					"\t-m<maxmsg>   max messages on broker control queue\n"
 					"\n");
+#if PSMQ_HAVE_EMBEDLOG
 			printf(
 					"logging levels:\n"
 					"\t0         fatal errors, application cannot continue\n"
@@ -149,6 +154,7 @@ static int cfg_parse_args
 					"\t6         info log, doesn't print that much (default)\n"
 					"\t7         debug, not needed in production\n"
 					"\n");
+#endif
 			return -2;
 
 		case 'v':
@@ -200,7 +206,9 @@ int psmqd_cfg_init
 
 	/* set g_psmqd_cfg object to well-known default state */
 	memset(&g_psmqd_cfg, 0x00, sizeof(g_psmqd_cfg));
+#if PSMQ_HAVE_EMBEDLOG
 	g_psmqd_cfg.log_level = EL_INFO;
+#endif
 	g_psmqd_cfg.broker_maxmsg = 10;
 	g_psmqd_cfg.broker_name = "/psmqd";
 
@@ -232,12 +240,14 @@ void psmqd_cfg_print(void)
 
 	el_oprint(OELN, PACKAGE_STRING);
 	el_oprint(OELN, "psmqd configuration");
+#if PSMQ_HAVE_EMBEDLOG
 	CONFIG_PRINT(log_level, "%d");
 	CONFIG_PRINT(colorful_output, "%d");
 	if (g_psmqd_cfg.program_log)
 		CONFIG_PRINT(program_log, "%s");
 	else
 		CONFIG_PRINT(program_log, "(stderr)");
+#endif
 	CONFIG_PRINT(broker_name, "%s");
 	CONFIG_PRINT(broker_maxmsg, "%d");
 	CONFIG_PRINT(remove_queue, "%d");

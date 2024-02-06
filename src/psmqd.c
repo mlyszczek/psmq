@@ -23,7 +23,6 @@
    ========================================================================== */
 
 
-#include <embedlog.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,7 +33,9 @@
 
 #include "globals.h"
 #include "broker.h"
+#include "psmq-common.h"
 
+#define EL_OPTIONS_OBJECT &g_psmqd_log
 
 /* ==========================================================================
                   _                __           ____
@@ -131,6 +132,7 @@ int psmqd_main
 	el_ooption(&g_psmqd_log, EL_FILE_SYNC_EVERY, 0);
 	el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_STDERR);
 
+#if PSMQ_HAVE_EMBEDLOG
 	if (g_psmqd_cfg.program_log)
 	{
 		/* save logs to file if that file is specified */
@@ -144,19 +146,20 @@ int psmqd_main
 			el_ooption(&g_psmqd_log, EL_OUT, EL_OUT_STDERR);
 		}
 	}
+#endif
 
 	psmqd_cfg_print();
 
 	if (psmqd_broker_init() != 0)
 	{
-		el_oprint(ELF, &g_psmqd_log, "failed to initialize broker");
+		el_oprint(OELF, "failed to initialize broker");
 		goto broker_init_error;
 	}
 
 	psmqd_broker_start();
 	psmqd_broker_cleanup();
 
-	el_oprint(ELN, &g_psmqd_log, "exiting psmqd");
+	el_oprint(OELN, "exiting psmqd");
 
 broker_init_error:
 	el_ocleanup(&g_psmqd_log);
