@@ -242,7 +242,7 @@ void psmqd_cfg_print(void)
 	CONFIG_PRINT(broker_maxmsg, "%d");
 	CONFIG_PRINT(remove_queue, "%d");
 	CONFIG_PRINT_VAR(PSMQ_MSG_MAX, "%u");
-	CONFIG_PRINT_VAR(sizeof(struct psmq_msg), "%lu");
+	CONFIG_PRINT_VAR(sizeof(struct psmq_msg), "%zu");
 
 #undef CONFIG_PRINT
 }
