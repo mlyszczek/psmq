@@ -13,6 +13,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include <sys/time.h>
+#include <time.h>
 
 /* hard limits, these are minimal values that either makes sense or
  * psmq cannot properly work with different values that these or
