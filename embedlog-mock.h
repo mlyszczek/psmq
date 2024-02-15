@@ -9,10 +9,9 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
-/* for systems that don't have embedlog - or they have choosen not to compile
- * it, we provide simple mock functions. This will still allow for program
- * to print log messages, though in limited fassion. Better than nothing */
+#ifdef CONFIG_PSMQ_DEBUG_LOGS
 
 /* Disable init, cleanup and option functions, they are useless, and logging
  * system should already be in place by the time psmq starts */
@@ -63,5 +62,17 @@ static inline int el_operror_mock
 
 	return rc;
 }
+
+#else /* CONFIG_PSMQ_DEBUG_LOGS */
+
+#define el_oinit(...)
+#define el_ocleanup(...)
+#define el_ooption(...)
+#define el_oflush(...)
+#define el_opmemory(...)
+#define el_oprint(...)
+#define el_operror(...)
+
+#endif /* CONFIG_PSMQ_DEBUG_LOGS */
 
 #endif /* PSMQ_EMBEDLOG_MOCK_H */
