@@ -4,13 +4,13 @@
 config ZEPHYR_PSMQ_MODULE
 	bool
 
-comment "psmq requires POSIX_MQUEUE"
-	depends on !POSIX_MQUEUE
-
-menuconfig PSMQ
+config PSMQ
 	bool "psmq"
 	default n
-	depends on POSIX_MQUEUE
+	select GETOPT
+	select POSIX_MQUEUE
+	select POSIX_CLOCK
+	select PTHREAD_IPC
 	---help---
 		psmq is tool set which allows IPC communication in publish/subscribe way
 		created on top of posix messege queue. Full documentation is available
@@ -50,6 +50,14 @@ config PSMQ_MSG_MAX
 		number of bytes that are sent because only actual data
 		is sent over mqueue.
 
+config PSMQ_DEBUG_LOGS
+	bool "Enable debug logs"
+	default n
+	---help---
+		Enable debug logs for all psmq related functions. This may be
+		helpful finding out why messages do not reach its destination.
+		Useless on production builds or when psmq works as expected.
+
 config PSMQD_PRIORITY
 	int "psmqd broker task priority"
 	default 100
@@ -59,26 +67,18 @@ config PSMQD_STACKSIZE
 	default 2048
 
 config PSMQ_TOOLS_PUB
-	bool "Enable psmq_pub tool"
+	bool "Enable psmq_pub shell tool"
+	select SHELL
+	select SHELL_GETOPT
 	default n
 	---help---
 		Enables program which allows to publish message over psmq directly
 		from command line.
 
-if PSMQ_TOOLS_PUB
-
-config PSMQ_PUB_PRIORITY
-	int "psmq_pub broker task priority"
-	default 100
-
-config PSMQ_PUB_STACKSIZE
-	int "psmq_pub broker stack size"
-	default 1024
-
-endif # PSMQ_TOOLS_PUB
-
 config PSMQ_TOOLS_SUB
-	bool "Enable psmq_sub tool"
+	bool "Enable psmq_sub shell tool"
+	select SHELL
+	select SHELL_GETOPT
 	default n
 	---help---
 		Enables program which allows to listen to published messages on
@@ -93,7 +93,8 @@ config PSMQ_SUB_PRIORITY
 
 config PSMQ_SUB_STACKSIZE
 	int "psmq_sub broker stack size"
-	default 1024
+	default 2048
 
 endif # PSMQ_TOOLS_SUB
+
 endif # SYSTEM_PSMQ
