@@ -20,7 +20,7 @@ void psmq_test_group(void);
 
 int main(void)
 {
-#if TEST_ENABLE_RANDOM_SEED
+#if TEST_ENABLE_RANDOM
 	int fd;
 	unsigned int seed;
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -37,9 +37,6 @@ int main(void)
 
 	srand(seed);
 	fprintf(stderr, "seed value: %u\n", seed);
-#else
-	srand(1);
-	fprintf(stderr, "seed value: 1\n");
 #endif
 
 	el_init();

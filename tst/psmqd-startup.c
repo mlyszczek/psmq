@@ -222,15 +222,30 @@ void psmqt_gen_random_string
 {
 	static const char  alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 	size_t             i;
+	static int         inited;
+	static char       *pad;
+	static unsigned long long index;
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 	if (l == 0)
 		return;
 
+	if (inited == 0)
+	{
+		pad = malloc(1024);
+		memset(pad, '-', 1024);
+		inited = 1;
+	}
+
+#if TEST_ENABLE_RANDOM
 	for (i = 0; i != l; ++i)
 		s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-
-	s[i - 1] = '\0';
+#else
+	i = snprintf(s, l, "%llu", index++);
+	if (i < l)
+		strncat(s, pad, l - i);
+#endif
+	s[l - 1] = '\0';
 }
 
 /* ==========================================================================
