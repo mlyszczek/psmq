@@ -1,0 +1,149 @@
+.TH "psmq_building" "7" "19 May 2021 (v9999)" "bofc.pl"
+.SH NAME
+.PP
+.B psmq_building
+- information about building
+.B psmq
+library.
+.SH DESCRIPTION
+.PP
+.B psmq
+is targeted mainly for small embedded systems which do not have advanced IPC
+like unix domain sockets.
+It doesn't have much usecases (if any) on big OSes like
+.B Linux
+- there are far more advanced solutions for such systems.
+.B psmq
+library cares mainly about memory and runtime safety.
+It can be build and run on every
+.B UNIX
+though to make application developemt and testing much easier - you can write
+and test your app on
+.B UNIX
+system and then just move it to embedded posix-compliant system without changes.
+.PP
+To avoid dynamic memory allocation as much as possible, most options are set
+during compile time, and since this is mainly for embedded systems - it's not a
+problem.
+.SH "PASSING SETTINGS"
+.PP
+Depending on how you want to compile this software, there are a few ways to
+define settings.
+.SS AUTOTOOLS
+.PP
+If you build for
+.B UNIX
+system, it's the easiest and best way to install
+.B psmq
+library and programs.
+Settings are passed to
+.I configure
+script as environment variables like that
+.PP
+.nf
+    PSMQ_MAX_CLIENTS=128 PSMQ_MSG_MAX=64 ./configure
+.fi
+.PP
+And of course after that, there is standard "make" and "make install".
+You're done.
+.SS "COMPILER DEFINITIONS"
+.PP
+If you integrate
+.B psmq
+into bare metal embedded system without OS, you can just define options.
+How you do it heavily depends on your build system.
+For cmake, you could use
+.PP
+.nf
+    add_definitions(-DPSMQ_MAX_CLIENTS=128 -DPSMQ_MSG_MAX=32)
+.fi
+.PP
+If you are using "make" based build system, you would use something along the
+lines
+.PP
+.nf
+    CFLAGS += -DPSMQ_MAX_CLIENTS=128
+    CFLAGS += -DPSMQ_MSG_MAX=64
+.fi
+.SS "CONFIG FILE"
+.PP
+You can also define all of those values in
+.B psmq-config.h
+file.
+That file should be directly accessible by compiler - every source file includes
+this file this way:
+.PP
+.nf
+    #ifdef HAVE_CONFIG_H
+    #   include "psmq-config.h"
+    #endif
+.fi
+.PP
+You also must define
+.BR HAVE_CONFIG_H .
+To define options, you just do classic
+.B C
+definitions
+.PP
+.nf
+    #define PSMQ_MAX_CLIENTS 128
+    #define PSMQ_MSG_MAX 64
+.fi
+.SH "COMPILATION OPTIONS"
+.TP
+.BR PSMQ_MAX_CLIENTS\  (int)
+This defines how many clients single broker process will support.
+Broker will return error for clients that want to register to it and there are
+already max clients connected.
+.B psmqd
+will alocate client array with static storage duration that is about 12 bytes
+(may vary depending on architecture) for each client.
+.TP
+.BR PSMQ_MSG_MAX\  (int)
+Defines maximum size of topic + payload that can be sent via
+.BR psmq .
+Topic and payload are sent in a single buffer, so they share memory.
+This allows for some flexibility, as you can send one message with big
+topic name, but no payload data and another message can have short topic,
+but much more payload.
+This option has direct impact on memory usage of broker and library.
+But even if you set this to high value, only actual payload will be sent.
+So you could set
+.B PSMQ_MSG_MAX
+to 1024 bytes, send message on topic "/t" and one byte of payload, and then
+only 4 bytes and not 1024 will be copied over mqueue.
+.PP
+.TP
+.BR PSMQ_NO_SIGNALS\  (bool)
+Signals were implemented mainly for full-fledged UNIXes, but many embedded
+simply does not implement signals. If you want to use
+.B psmq
+on such system, define this to 1. It is not possible to set this when building
+with autotools. C'mon, if you can use autotools you surely have signals.
+.SH DEPENDENCIES
+.PP
+<<<<<<< HEAD
+Broker needs
+.B >=embedlog-v9999
+=======
+Broker and psmq-sub need
+.B >=embedlog-v0.6.0
+>>>>>>> 52d73fe... man: update man pages
+for logging.
+It can be downloaded from
+.B https://embedlog.bofc.pl
+.SH "SEE ALSO"
+.PP
+.BR psmqd (1),
+.BR psmq-pub (1),
+.BR psmq-sub (1),
+.BR psmq_cleanup (3),
+.BR psmq_init (3),
+.BR psmq_publish (3),
+.BR psmq_receive (3),
+.BR psmq_subscribe (3),
+.BR psmq_timedreceive (3),
+.BR psmq_timedreceive_ms (3),
+.BR psmq_unsubscribe (3),
+.BR psmq_building (7),
+.BR psmq_overview (7).

@@ -11,6 +11,13 @@
 .BR -v ]
 .br
 .B psmq-pub
+.B -t
+.I topic
+.RB [ -m
+.IR message \ |
+.BR -e \ | \ -B \ ]
+.br
+.B psmq-pub
 .B -b
 .I name
 .B -t
@@ -29,20 +36,6 @@ Prints short help and exits
 .TP
 .B -v
 Prints version information and exits
-.TP
-.BI -n\  mqueue-name
-mqueue
-.B psmq-sub
-will create and use to communicate with broker.
-This argument is optional and by default
-.B /psmq_pub
-will be used.
-.TP
-.BI -b\  name
-mqueue
-.I name
-of the broker you want to use for communication.
-This option is mandatory
 .TP
 .BI -t\  topic
 .I topic
@@ -77,21 +70,41 @@ Default priority is 0 if not specified.
 Higher values means higher priority.
 Priority is limited by system's implementation of mqueue.
 Please refer to it to see maximum priority value.
+.TP
+.BI -n\  mqueue-name
+mqueue
+.B psmq-sub
+will create and use to communicate with broker.
+This argument is optional and by default
+.B /psmq_pub
+will be used.
+.TP
+.BI -b\  name
+mqueue
+.I name
+of the broker you want to use for communication.
+This option is optional, and by default
+.B /psmqd
+will be used.
 .SH EXAMPLES
 .TP
 Send single message with default priority
 .B psmq-pub
--b/brok -t/topic1 -m "test message to send"
+-t/topic1 -m "test message to send"
 .TP
 Publish content of the file with priority 5
 cat file-with-content |
 .B psmq-pub
--b/brok -t/topic1 -p5
+-t/topic1 -p5
 .TP
 Send sequence of binary data
 printf "\\x13\\x37\\x04\\x51" |
 .B psmq-pub
--b/brok -t/topic1 -B
+-t/topic1 -B
+.TP
+Send data to custom broker
+.B psmq-pub
+-b/broker-name -t/topic1 -mmessage
 .SH "BUG REPORTING"
 .PP
 Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"

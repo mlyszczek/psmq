@@ -9,7 +9,9 @@ object and initializes connection with the broker.
 .PP
 .BI "#include <psmq.h>"
 .PP
-.BI "int psmq_init(struct psmq *" psmq ", const char *" brokername ", \
+.BI "int psmq_init(struct psmq *" psmq ", int " maxmsg ")"
+.br
+.BI "int psmq_init_named(struct psmq *" psmq ", const char *" brokername ", \
 const char *" mqname ", int " maxmsg ")"
 .SH DESCRIPTION
 .PP
@@ -43,6 +45,19 @@ allows only one slash - at the beginning, so "/name" is only acceptable
 there.
 Refer to your system's manual about mqueue for details.
 .PP
+Both
+.I brokername
+and
+.I mqname
+can be set to NULL.
+In that case
+.I brokername
+will be
+.B /psmqd
+and
+.I mqname
+will be automatically generated for you.
+.PP
 .I maxmsg
 defines how much messages can be queued in
 .I mqname
@@ -51,6 +66,22 @@ If this value is not big enough, and your program is not quick enough to
 process incoming data from queue, when queue gets full, broker will drop
 incoming messages until there is place in the queue again.
 Lost packets are lost though.
+.PP
+.BR psmq_init (3)
+Works the same but does not take queue names.
+For connecting to broker, client will use default
+.B /psmqd
+queue, and for client queue, a name will be generated in format
+.BR /psmqcNNN ,
+where NNN is a number from 000 to 255.
+Because of that, with this method there may not be more than 255 clients.
+If you need more you should use
+.BR psmq_init_named (3)
+to use custom naming.
+.BR psmq_init (3)
+is equivalent of calling
+.B psmq_init_named(&psmq, NULL, NULL, maxmsg)
+.
 .SH "RETURN VALUE"
 .PP
 When all memory has been allocated properly and broker sends back register

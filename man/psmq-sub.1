@@ -13,6 +13,14 @@
 ]
 .br
 .B psmq-sub
+.RB < -t
+.IR topic >
+.RB [< -t
+.IR topic >]
+.RB [ -o
+.IR file ]
+.br
+.B psmq-sub
 .RB [< -n
 .IR mqueue-name >]
 .RB < -b
@@ -31,6 +39,16 @@ Prints short help and exits
 .B -v
 Prints version information and exits
 .TP
+.BI -t\  topic
+.I topic
+you want to subscribe to.
+At least one
+.I topic
+must be passed.
+You can subscribe to as many topics as you want by passing multiple
+.B -t
+options.
+.TP
 .BI -n\  mqueue-name
 .B psmq-sub
 will create and use to communicate with broker.
@@ -45,20 +63,13 @@ then this argument must be the first one you pass.
 mqueue
 .I name
 of the broker you want to use for communication.
-This options is mandatory and must be passed after (if set)
+This options is optional by default
+.B /psmqd
+will be used.
+If you want to use custom broker name this parameter must be passed after (if set)
 .B -n
 argument and before
 .BR -t .
-.TP
-.BI -t\  topic
-.I topic
-you want to subscribe to.
-At least one
-.I topic
-must be passed.
-You can subscribe to as many topics as you want by passing multiple
-.B -t
-options.
 .TP
 .BI -o\  path
 .I Path
@@ -66,6 +77,14 @@ to a file, where logs from incoming messages shall be stored.
 If file cannot be opened, program will refuse to start.
 Optional argument, if not passed, messages will be printed to
 .BR stdout .
+This options is only available when
+.B psmq
+is build with
+.B embedlog
+support.
+Otherwise messages will be printed to
+.BR stdout ,
+which can be redirected to file before calling main function.
 .PP
 Data will be printed in two ways depending on type of data received.
 When received data is simple ascii string, payload will be printed
@@ -136,7 +155,7 @@ Log from different sensors may look like this
 .TP
 Listen to single topic
 .B psmq-sub
--b/brok -t/topic1
+-t/topic1
 .TP
 Listen on multiple topics, use custom mqueue name
 .B psmq-sub
@@ -144,7 +163,7 @@ Listen on multiple topics, use custom mqueue name
 .TP
 Log every topic into file
 .B psmq-sub
--b/brok -t/* -o/var/log/psmq-log
+-t/* -o/var/log/psmq-log
 .SH "BUG REPORTING"
 .PP
 Please, report all bugs to "Michał Łyszczek <michal.lyszczek@bofc.pl>"

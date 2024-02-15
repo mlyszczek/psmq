@@ -96,7 +96,7 @@ Set reply timeout.
         /* initialize psmq object that will create /sub mqueue for
          * receiving data, and will connect to broker of name /brok.
          * Max items in queue is set to 10 */
-        psmq_init(&psmq, "/brok", "/sub", 10);
+        psmq_init(&psmq, 10);
 
         /* set reply timeout with psmq_ioctl() function */
         psmq_ioctl(&psmq, PSMQ_IOCTL_REPLY_TIMEOUT, 100);

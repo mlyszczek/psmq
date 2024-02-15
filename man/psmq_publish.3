@@ -107,10 +107,10 @@ Error checking ommited for better readability.
         struct psmq psmq;
         int rpm;
 
-        /* initialize psmq object that will create /sub mqueue for
-         * receiving data, and will connect to broker of name /brok.
+        /* initialize psmq object that will automatically create mqueue for
+         * receiving data, and will connect to default broker of name /psmqd.
          * Max items in queue is set to 10 */
-        psmq_init(&psmq, "/brok", "/sub", 10);
+        psmq_init(&psmq, 10);
 
         /* if we don't want to receive any message, we can skip
          * susbscribe function. */

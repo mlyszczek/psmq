@@ -5,28 +5,30 @@ About
 
 **psmq** is **p**ublish **s**ubscribe **m**essage **q**ueue. It's a set of
 programs and libraries to implement publish/subscribe way of inter process
-communication on top of **POSIX** message queue. This program targets mainly
-small embedded systems, which do not have access to some more sophisticated IPC
-(like unix domain socket). It could also prove useful when you want to realy
-heavly on message priority, since every message has set a priority and broker
-processes messages from highest ones first. It's main focues is memory and
-runtime safety, speed is treated as second class citizen - but of course is not
-ignored completely, it's just memory and safety comes first. Always.
+communication on top of **POSIX** message queue (or some standard message
+queue that is available on given **RTOS** in case **POSIX** is not
+available. This program targets mainly small embedded systems, which do not
+have access to some more sophisticated IPC (like unix domain socket). It
+could also prove useful when you want to rely heavly on message priority,
+since every message has set a priority and broker processes messages from
+highest ones first. It's main focues is memory and runtime safety, speed is
+treated as second class citizen - but of course is not ignored completely,
+it's just memory and safety comes first. Always.
 
 Why?
 ====
 
 Good, question. Why would you want to add more code, to your project, when
 you can do all these things using ordinary queues - after all **psmq** is
-implemented on top of **mqueue**. Well, if you only communicate processes in
-1:1 way, you won't find this library useful - it's easy enough to create 2
-queues and send/receive from them. No. Publish subscribe model shines best when
-you need to communicate N:N processes. That is for example, you have process1
-that handles hardware and reads battery level via **CAN**. Now couple of
-processes might be interested in battery level, so you simply publish that
-information on "/battery/level" topic and any other processes might
-subscribe to it and read it. Some examples who could be interested in such
-messages:
+implemented on top of **mqueue** (or platform queue). Well, if you only
+communicate processes in 1:1 way, you won't find this library useful - it's
+easy enough to create 2 queues and send/receive from them. No. Publish
+subscribe model shines best when you need to communicate N:N processes. That
+is for example, you have process1 that handles hardware and reads battery
+level via **CAN**. Now couple of processes might be interested in battery
+level, so you simply publish that information on "/battery/level" topic and
+any other processes might subscribe to it and read it. Some examples who
+could be interested in such messages:
 
 * graphical user interface - for nice displaying battery status
 * engine control unit - to shut down engine to prevent battery damage
@@ -54,8 +56,56 @@ For detailed information about using broker and library, check out
 Examples
 ========
 
-Example of receiving message is in
-[psmq_receive](https://psmq.bofc.pl/manuals/psmq_receive.3.html)(3) manual
+Super quick examples:
+
+Publish engine RPM once per second on "/can/engine/rpm" topic.
+
+```{.c}
+#include <psmq.h>
+int main(void) {
+    struct psmq psmq;
+    int rpm;
+
+    psmq_init(&psmq, 10);
+    for (;;) {
+        engine_get_rpm(&rpm);
+        psmq_publish(&psmq, "/can/engine/rpm", &rpm, sizeof(rpm), 0);
+        sleep(1);
+    }
+    psmq_cleanup(&psmq);
+    return 0;
+
+}
+```
+
+Subscribe to multiple topics, and print RPMs of all systems
+```{.c}
+#include <psmq.h>
+#include <stdio.h>
+
+int main(void)
+{
+    struct psmq psmq;
+    int rpm;
+
+    psmq_init(&psmq, 10);
+    psmq_subscribe(&psmq, "/can/+/rpm");
+    psmq_subscribe(&psmq, "/spi/+/rpm");
+
+    for (;;)
+        struct psmq_msg msg;
+        psmq_receive(&psmq, &msg, NULL);
+        memcpy(&rpm, PSMQ_PAYLOAD(msg), sizeof(rpm));
+        printf("topic: %s; rpm %d\n", PSMQ_TOPIC(msg), rpm);
+    }
+
+    psmq_cleanup(&psmq);
+    return 0;
+}
+```
+
+More complete (with comments and documentation) example of receiving message
+is in [psmq_receive](https://psmq.bofc.pl/manuals/psmq_receive.3.html)(3) manual
 page, and example of publishing message is in
 [psmq_publish](https://psmq.bofc.pl/manuals/psmq_publish.3.html)(3) manual
 page.
@@ -67,11 +117,11 @@ Dependencies
 ============
 
 All code follows **ANSI C** and **POSIX** standard (version 200112).
-Project has no hard dependencies. The only optional dependency is
-**embedlog** which enables more detailed debug logs (like, log location)
-and alows for easy logging onto file or other facilities. Without
-**embedlog** logs are still available but are only printed to stderr
-using stdio.
+Project has no hard dependencies. Since version v0.3.0, the only optional
+dependency is **embedlog** which enables more detailed debug logs (like, log
+location) and allows for easy logging onto file or other facilities. Without
+**embedlog** logs are still available but are only printed to stderr using
+stdio.
 
 Broker and psmq-sub optionally can support embedlog library for
 enhanced logging.

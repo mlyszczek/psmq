@@ -26,10 +26,15 @@ int main(void)
 {
     struct psmq  *psmq; /* psmq library object, passed to all psmq functions */
     struct psmq_msg  msg; /* struct that holds received message from broker */
+    int data;
 
     /* Library is very easy to use, at first you need to
      * initialize library object and connect to the broker */
-    psmq_init(&psmq, "/broker-queue", "/our-queue", 10);
+    psmq_init(&psmq, 10);
+    /* You can also specify custom broker and queue name. On embedded
+     * systems this is really not necessary, but the option is there
+     * should you somehow needed it */
+    psmq_init_named(&psmq, "/broker-queue", "/our-queue", 10);
 
     /* now you are ready publish messages */
     psmq_publish(&psmq, "/topic", "data", strlen("data") + 1, 0);
@@ -42,6 +47,14 @@ int main(void)
 
     /* now you can start receiving data */
     psmq_receive(&psmq, &msg, NULL);
+
+    /* and do something with it, like printing it */
+    memcpy(&data, PSMQ_PAYLOAD(msg), sizeof(data));
+    printf("received topic: %s, data: %d\n", PSMQ_TOPIC(msg), data);
+
+    /* You can very well publish and receive messages with single
+     * psmq object. We can now republish received msg on other topic */
+    psmq_publish(&psmq, "/all", PSMQ_PAYLOAD(msg), msg.paylen, 0)
 
     return 0;
 }
@@ -62,7 +75,7 @@ The
 .B psmq
 communication is based on the publish subscribe principle.
 Multiple clients can connect to the broker.
-Any client can subscribe to any ammount of topics and any client can send
+Any client can subscribe to any amount of topics and any client can send
 message to any topic.
 Such message will be received by all clients that are subsribed to the topic.
 It is perfectly ok for many clients to subsribe to same topic as for many
@@ -231,6 +244,7 @@ Following functions are available
 .TS
 l	l.
 \fBpsmq_init\fR(3)	initializes psmq object and connects to the broker
+\fBpsmq_init_named\fR(3)	initializes psmq object with custom queue names and connects to the broker
 \fBpsmq_cleanup\fR(3)	cleanup whatever has been allocated by init
 \fBpsmq_publish\fR(3)	publishes message on given topic
 \fBpsmq_receive\fR(3)	receive single message from the broker

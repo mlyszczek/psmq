@@ -189,10 +189,10 @@ Note: error checking has been ommited for clarity.
         int rpm;
         int i;
 
-        /* initialize psmq object that will create /sub mqueue for
-         * receiving data, and will connect to broker of name /brok.
+        /* initialize psmq object that will automatically create mqueue for
+         * receiving data, and will connect to default broker of name /psmqd.
          * Max items in queue is set to 10 */
-        psmq_init(&psmq, "/brok", "/sub", 10);
+        psmq_init(&psmq, 10);
 
         /* subscribe to receive revolution per minute information */
         psmq_subscribe(&psmq, "/can/+/rpm");
