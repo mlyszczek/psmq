@@ -138,7 +138,7 @@ static int cfg_parse_args
 					"\t-p<path>     where logs will be stored (stdout if not specified)\n");
 #endif
 			printf(
-					"\t-b<name>     name for broker control queue\n"
+					"\t-b<name>     name for broker control queue, default: /psmqd\n"
 					"\t-r           if set, control queue will be removed before starting\n"
 					"\t-m<maxmsg>   max messages on broker control queue\n"
 					"\n");

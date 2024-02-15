@@ -21,6 +21,10 @@
 #include <sys/time.h>
 #include <time.h>
 
+
+/* default name for psmq broker to use, when none is specified */
+#define PSMQD_DEFAULT_QNAME "/psmqd"
+
 /* hard limits, these are minimal values that either makes sense or
  * psmq cannot properly work with different values that these or
  * internal types forbids some values to be bigger */

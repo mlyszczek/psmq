@@ -52,7 +52,7 @@ static void psmq_initialize(void)
 
 
 	psmqt_gen_queue_name(qname, sizeof(qname));
-	mt_fok(psmq_init(&psmq, gt_broker_name, qname, 10));
+	mt_fok(psmq_init_named(&psmq, gt_broker_name, qname, 10));
 	mt_fok(psmq_cleanup(&psmq));
 	mq_unlink(qname);
 }
@@ -68,7 +68,7 @@ static void psmq_initialize_queue_not_exist(void)
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 	mq_unlink("/b");
-	mt_ferr(psmq_init(&psmq, "/b",  "/q", 10), ENOENT);
+	mt_ferr(psmq_init_named(&psmq, "/b",  "/q", 10), ENOENT);
 	mq_unlink("/q");
 }
 
@@ -301,12 +301,12 @@ static void psmq_initialize_too_much_clients(void)
 	psmqt_gen_unique_queue_name_array(qname, PSMQ_MAX_CLIENTS + 2, QNAME_LEN);
 
 	for (i = 0; i != PSMQ_MAX_CLIENTS; ++i)
-		mt_fail(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+		mt_fail(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 
 	/* now create 2 clients that won't fit into broker memory */
-	mt_ferr(psmq_init(&psmq[i], gt_broker_name, qname[i], 10), ENOSPC);
+	mt_ferr(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10), ENOSPC);
 	++i;
-	mt_ferr(psmq_init(&psmq[i], gt_broker_name, qname[i], 10), ENOSPC);
+	mt_ferr(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10), ENOSPC);
 
 	for (i = 0; i != PSMQ_MAX_CLIENTS; ++i)
 	{
@@ -317,9 +317,9 @@ static void psmq_initialize_too_much_clients(void)
 	/* now that slots are free, again try to connect those
 	 * two failed connections */
 
-	mt_fail(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+	mt_fail(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 	++i;
-	mt_fail(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+	mt_fail(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 
 	--i;
 	mt_fok(psmq_cleanup(&psmq[i]));
@@ -377,23 +377,21 @@ void psmq_test_group(void)
 	memset(&tp, 0x00, sizeof(tp));
 	memset(&psmq_uninit, 0x00, sizeof(psmq));
 	psmqt_gen_queue_name(qname, sizeof(qname));
-	psmq_init(&psmq, gt_broker_name, qname, 10);
+	psmq_init_named(&psmq, gt_broker_name, qname, 10);
 	psmqt_gen_random_string(buf, sizeof(buf));
 	psmqt_gen_random_string(long_qname, sizeof(long_qname));
 	long_qname[0] = '/';
 	buf[0] = '/';
 
 #define CHECK_ERR(f, e) mt_run_quick(f == -1 && errno == e)
-	CHECK_ERR(psmq_init(NULL, "/b",  "/q", 10), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, NULL, "/q", 10), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, "/b", NULL, 10), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, "b",  "/q", 10), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, "/b", "q",  10), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, "",   "/q", 10), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, "/b", "",   10), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, "/b", "/q",  0), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, "/b", "/q", -1), EINVAL);
-	CHECK_ERR(psmq_init(&psmq, "/b", buf, 10), ENAMETOOLONG);
+	CHECK_ERR(psmq_init_named(NULL, "/b",  "/q", 10), EINVAL);
+	CHECK_ERR(psmq_init_named(&psmq, "b",  "/q", 10), EINVAL);
+	CHECK_ERR(psmq_init_named(&psmq, "/b", "q",  10), EINVAL);
+	CHECK_ERR(psmq_init_named(&psmq, "",   "/q", 10), EINVAL);
+	CHECK_ERR(psmq_init_named(&psmq, "/b", "",   10), EINVAL);
+	CHECK_ERR(psmq_init_named(&psmq, "/b", "/q",  0), EINVAL);
+	CHECK_ERR(psmq_init_named(&psmq, "/b", "/q", -1), EINVAL);
+	CHECK_ERR(psmq_init_named(&psmq, "/b", buf, 10), ENAMETOOLONG);
 	CHECK_ERR(psmq_cleanup(NULL), EINVAL);
 	CHECK_ERR(psmq_cleanup(&psmq_uninit), EBADF);
 

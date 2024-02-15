@@ -205,6 +205,53 @@ static int on_receive
 
 
 /* ==========================================================================
+    Opens connection to the broker named $brokname.
+   ========================================================================== */
+
+
+static int psmq_sub_connect
+(
+	struct psmq *psmq,
+	const char  *brokname,
+	const char  *qname
+)
+{
+	static int   connected;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+	if (connected)
+	{
+		el_oprint(OELW, "client already connected, "
+				"did you use -b after -t option?\n"
+				"Ignoring second connect request");
+		return 0;
+	}
+
+	el_oprint(OELN, "init: broker name: %s, queue name: %s",
+			brokname, qname);
+
+	if (psmq_init_named(psmq, brokname, qname, 10) == 0)
+	{
+		el_oprint(OELN, "connected to broker %s", optarg);
+		connected = 1;
+		return 0;
+	}
+
+	if (errno == EINVAL)
+		el_oprint(OELF, "broker or queue name is invalid");
+	else if (errno == ENAMETOOLONG)
+		el_oprint(OELF, "queue name is too long (%lu), max is %u",
+				strlen(qname), PSMQ_MSG_MAX - 1);
+	else if (errno == ENOENT)
+		el_oprint(OELF, "broker %s doesn't exist", optarg);
+	else
+		el_operror(OELF, "psmq_init: unknown error: %d", errno);
+
+	return -1;
+}
+
+/* ==========================================================================
                                               _
                            ____ ___   ____ _ (_)____
                           / __ `__ \ / __ `// // __ \
@@ -278,38 +325,20 @@ int psmq_sub_main
 			/* broker name passed, open connection to the broker,
 			 * if qname was not set, use default /psmq-sub queue */
 			got_b = 1;
-			el_oprint(OELN, "init: broker name: %s, queue name: %s",
-					optarg, qname);
-			if (psmq_init(&psmq, optarg, qname, 10) != 0)
-			{
-				switch (errno)
-				{
-				case EINVAL:
-					el_oprint(OELF, "broker or queue name is invalid");
-					break;
-
-				case ENAMETOOLONG:
-					el_oprint(OELF, "queue name is too long (%lu), max is %u",
-							strlen(qname), PSMQ_MSG_MAX - 1);
-					break;
-
-				case ENOENT:
-					el_oprint(OELF, "broker %s doesn't exist", optarg);
-					break;
-
-				default:
-					el_operror(OELF, "psmq_init: unknown error: %d", errno);
-					break;
-				}
-
+			if (psmq_sub_connect(&psmq, optarg, qname))
 				return 1;
-			}
-			el_oprint(OELN, "connected to broker %s", optarg);
 			break;
 
 		case 't':
+			if (got_b == 0 && got_t == 0)
+				/* Broker name not specified, and this is first topic
+				 * subscription. Connect to broker with default name */
+				if (psmq_sub_connect(&psmq, PSMQD_DEFAULT_QNAME, qname))
+					return 1;
+
 			/* topic passed, subscribe to the broker */
 			got_t = 1;
+
 			if (psmq_subscribe(&psmq, optarg) != 0)
 			{
 				switch (errno)
@@ -378,7 +407,6 @@ int psmq_sub_main
 #else
 			fprintf(stderr, "WARNING: Logging to file requires embedlog\n");
 #endif
-
 			break;
 
 		case 'v':
@@ -392,8 +420,9 @@ int psmq_sub_main
 					"\n"
 					"usage: \n"
 					"\t%s [-h | -v]\n"
-					"\t%s <[-n mqueue-name]> <-b name> <-t topic> <[-t topic]> [-o <file>]\n"
-					"\n", argv[0], argv[0], argv[0]);
+					"\t%s <-t topic> <[-t topic]> [-o <file>]\n"
+					"\t%s <[-n mqueue-name]> <[-b name]> <-t topic> <[-t topic]> [-o <file>]\n"
+					"\n", argv[0], argv[0], argv[0], argv[0]);
 			printf(
 					"\t-h                   shows help and exit\n"
 					"\t-v                   shows version and exit\n"
@@ -403,6 +432,16 @@ int psmq_sub_main
 					"\t-t <topic>           topic to subscribe to, can be used multiple times\n"
 					"\t-o <file>            file where to store logs from incoming messages\n"
 					"\t                     if not set, stdout will be used\n");
+			printf(
+					"examples:\n"
+					"Subscribe to one topic:\n"
+					"\tpsmq-sub -t /can\n"
+					"\n"
+					"Subscribe to multiple topics with wildcards:\n"
+					"\tpsmq-sub -t /can -t /can/engine/# -t /can/+/status\n"
+					"\n"
+					"Subscribe with custom name to custom broker:\n"
+					"psmq-sub -n /client-name -b /broker1 -t /can/#\n");
 			return 0;
 
 		case ':':
@@ -413,14 +452,6 @@ int psmq_sub_main
 			el_oprint(OELF, "unknown option -%c", optopt);
 			return 1;
 		}
-	}
-
-	if (got_b == 0)
-	{
-		/* no -b means no psmq_init() has been called,
-		 * we can bail without cleaning */
-		el_oprint(OELF, "missing -b option");
-		return 1;
 	}
 
 	if (got_t == 0)

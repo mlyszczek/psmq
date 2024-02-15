@@ -284,18 +284,12 @@ int psmq_timedreceive_ms
 
 
 /* ==========================================================================
-    Create mqueue for receiving and opens connection to broker
+    Opens connection to broker. Client queue should already be created.
 
     Return 0 when broker sends back connection confirmation or -1 when error
     occured.
 
     errno:
-            EINVAL      psmq is invalid (null)
-            EINVAL      brokername is invalid (null)
-            EINVAL      brokername does not start with '/'
-            EINVAL      mqname is invalid (null)
-            EINVAL      mqname does not start with '/'
-            EINVAL      maxmsg is 0 or less
             ENAMETOOLONG  mqname is bigger than PSMQ_MSG_MAX and thus cannot
                         be send to broker
             EACCES      Either brokername or mqname can't be opened due to
@@ -311,50 +305,22 @@ int psmq_timedreceive_ms
    ========================================================================== */
 
 
-int psmq_init
+static int psmq_init_wq
 (
 	struct psmq     *psmq,        /* psmq object to initialize */
 	const char      *brokername,  /* name of the broker to connect to */
-	const char      *mqname,      /* name of the reciving queue to create */
-	int              maxmsg       /* max queued messages in mqname */
+	const char      *mqname       /* name of the reciving queue to create */
 )
 {
-	struct mq_attr   mqa;         /* mqueue attributes */
 	int              ack;         /* ACK from the broker after open */
-	size_t           mqnamelen;   /* length of mqname string */
 	int              saveerrno;   /* saved errno value */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-	VALID(EINVAL, psmq);
-	VALID(EINVAL, brokername);
-	VALID(EINVAL, brokername[0] == '/');
-	VALID(EINVAL, mqname);
-	VALID(EINVAL, mqname[0] == '/');
-	VALID(EINVAL, maxmsg > 0);
-	mqnamelen = strlen(mqname);
-	VALID(ENAMETOOLONG, mqnamelen < PSMQ_MSG_MAX);
+	/* parameters already validated in previous functions */
 
 
-	memset(psmq, 0x00, sizeof(struct psmq));
-	memset(&mqa, 0x00, sizeof(mqa));
-
-	mqa.mq_msgsize = sizeof(struct psmq_msg);
-	mqa.mq_maxmsg = maxmsg;
-	psmq->qsub = (mqd_t)-1;
-	psmq->qpub = (mqd_t)-1;
 	ack = 0;
-
-	/* if staled queue exist, remove it, so it
-	 * doesn't do weird stuff */
-	mq_unlink(mqname);
-
-	/* open subscribe queue, where we will receive
-	 * data we subscribed to, and at the beginning
-	 * is used to report error from broker to client */
-	psmq->qsub = mq_open(mqname, O_RDONLY | O_CREAT, 0600, &mqa);
-	if (psmq->qsub == (mqd_t)-1)
-		return -1;
 
 	/* open publish queue, this will be used to
 	 * subscribe to topics at the start, and
@@ -452,6 +418,156 @@ error:
 
 	errno = saveerrno;
 	return -1;
+}
+
+
+/* ==========================================================================
+    Opens connection to broker. Function allows caller to provide both
+    brokername queue as well as it's own queue name. If these are not
+    specified (NULL), default broker name is used, and for client, queue
+    name is generated.
+
+    Return 0 when broker sends back connection confirmation or -1 when error
+    occured.
+
+    errno:
+            EINVAL      psmq is invalid (null)
+            EINVAL      brokername does not start with '/'
+            EINVAL      mqname does not start with '/'
+            EINVAL      maxmsg is 0 or less
+            ENAMETOOLONG  mqname is bigger than PSMQ_MSG_MAX and thus cannot
+                        be send to broker
+            EACCES      Either brokername or mqname can't be opened due to
+                        permissions
+            EACCES      mqname or brokername contains more than one '/'
+            ENFILE      system-wide limit on opened files has been reached
+            EMFILE      per-process limit on opened files has been reached
+            ENOENT      brokername does not exist
+            ENOENT      mqname or brokername was just "/" and nothing else
+            ENOMEM      not enough memory in the system
+            ENOSPC      not enough space for the creation of a new queue
+            ETIMEDOUT   no response from broker for 30 seconds
+   ========================================================================== */
+
+
+int psmq_init_named
+(
+	struct psmq     *psmq,        /* psmq object to initialize */
+	const char      *brokername,  /* name of the broker to connect to */
+	const char      *mqname,      /* name of the reciving queue to create */
+	int              maxmsg       /* max queued messages in mqname */
+)
+{
+	struct mq_attr mqa;
+	int            i;
+	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+	VALID(EINVAL, psmq);
+	VALID(EINVAL, maxmsg > 0);
+
+	if (brokername)
+		VALID(EINVAL, brokername[0] == '/');
+	else
+		brokername = PSMQD_DEFAULT_QNAME;
+
+	if (mqname)
+	{
+		int mqnamelen = strlen(mqname);
+		VALID(EINVAL, mqname[0] == '/');
+		VALID(ENAMETOOLONG, mqnamelen < PSMQ_MSG_MAX);
+	}
+
+
+	memset(psmq, 0x00, sizeof(struct psmq));
+	memset(&mqa, 0x00, sizeof(mqa));
+	mqa.mq_msgsize = sizeof(struct psmq_msg);
+	mqa.mq_maxmsg = maxmsg;
+
+	if (mqname)
+	{
+		/* if staled queue exist, remove it, so it
+		 * doesn't do weird stuff */
+		mq_unlink(mqname);
+
+		/* open subscribe queue, where we will receiv
+		 * data we subscribed to, and at the beginning
+		 * is used to report error from broker to client */
+		psmq->qsub = mq_open(mqname, O_RDONLY | O_CREAT, 0600, &mqa);
+		if (psmq->qsub == (mqd_t)-1)
+			return -1;
+	}
+	else
+	{
+		/* mqname not specified, we gotta generate it */
+		const char    *mqname_fmt = "/psmqc%3d";
+		char           mqname[9 + 1];
+		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+
+		/* Iterate thru /psmqc000 - /psmqc255 to find free mqueue */
+		for (i = 0; i < PSMQ_MAX_CLIENTS; i++)
+		{
+			sprintf(mqname, mqname_fmt, i);
+			/* open mqueue with O_EXCL, this will make sure mq_open(3) will
+			 * return error when queue already exists */
+			psmq->qsub = mq_open(mqname, O_RDONLY | O_CREAT | O_EXCL, 0600, &mqa);
+			if (psmq->qsub != (mqd_t)-1)
+				/* mqueue successfully opened, this is our queue now! */
+				break;
+
+			/* Error opening queue, but why? */
+
+			if (errno == EEXIST)
+				/* queue already exists, try next one */
+				continue;
+
+			/* Some other error while opening queue, we cannot handle those
+			 * so return to caller with error */
+			return -1;
+		}
+
+		if (i == PSMQ_MAX_CLIENTS)
+		{
+			/* it appears all queues are already used */
+			errno = ENOSPC;
+			return -1;
+		}
+	}
+
+	return psmq_init_wq(psmq, brokername, mqname);
+}
+
+
+/* ==========================================================================
+    Opens connection to broker. Function uses default name for broker and
+    generates name for client. Name will be in format "/psmqcNNN" where,
+    NNN is just a number.
+
+    Return 0 when broker sends back connection confirmation or -1 when error
+    occured.
+
+    errno:
+            EINVAL      psmq is invalid (null)
+            EINVAL      maxmsg is 0 or less
+            EACCES      Either brokername or mqname can't be opened due to
+                        permissions
+            ENFILE      system-wide limit on opened files has been reached
+            EMFILE      per-process limit on opened files has been reached
+            ENOENT      brokername does not exist (is psmqd started?)
+            ENOMEM      not enough memory in the system
+            ENOSPC      not enough space for the creation of a new queue
+            ETIMEDOUT   no response from broker for 30 seconds
+   ========================================================================== */
+
+
+int psmq_init
+(
+	struct psmq  *psmq,   /* psmq object to initialize */
+	int           maxmsg  /* max queued messages in mqname */
+)
+{
+	return psmq_init_named(psmq, NULL, NULL, maxmsg);
 }
 
 

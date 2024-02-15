@@ -94,9 +94,9 @@ struct psmq_msg
 };
 
 
-
-int psmq_init(struct psmq *psmq, const char *brokername, const char *mqname,
-		int maxmsg);
+int psmq_init(struct psmq *psmq, int maxmsg);
+int psmq_init_named(struct psmq *psmq, const char *brokername,
+		const char *mqname, int maxmsg);
 int psmq_cleanup(struct psmq *psmq);
 int psmq_subscribe(struct psmq *psmq, const char *topic);
 int psmq_unsubscribe(struct psmq *psmq, const char *topic);

@@ -127,13 +127,10 @@ static int psmqt_run_default(void)
 	time_t             start;  /* starting point of waiting for confirmation */
 	struct main_args  *args;   /* allocated args to create psmqd_main() with */
 	struct timespec    tp;     /* time to sleep between psmqd_main() run check*/
-	const char        *argv[] = { "psmqd", "-b", NULL, "-l6", "-p./psmqd.log",
+	const char        *argv[] = { "psmqd", "-l6", "-p./psmqd.log",
 		"-m10", NULL };
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-
-	psmqt_gen_queue_name(gt_broker_name, sizeof(gt_broker_name));
-	argv[2] = gt_broker_name;
 
 	args = malloc(sizeof(*args));
 	args->argc = sizeof(argv)/sizeof(*argv) - 1;
@@ -144,6 +141,8 @@ static int psmqt_run_default(void)
 		strcpy(args->argv[i], argv[i]);
 	}
 
+	memset(gt_broker_name, 0x00, sizeof(gt_broker_name));
+	strcpy(gt_broker_name, "/psmqd");
 	mq_unlink(gt_broker_name);
 	pthread_create(&gt_psmqd_t, NULL, psmqt_thread, args);
 
@@ -360,8 +359,8 @@ void psmqt_prepare_test_with_clients(void)
 			break;
 	}
 
-	mt_fok(psmq_init(&gt_pub_psmq, gt_broker_name, gt_pub_name, 10));
-	mt_fok(psmq_init(&gt_sub_psmq, gt_broker_name, gt_sub_name, 10));
+	mt_fok(psmq_init_named(&gt_pub_psmq, gt_broker_name, gt_pub_name, 10));
+	mt_fok(psmq_init_named(&gt_sub_psmq, gt_broker_name, gt_sub_name, 10));
 	mt_fok(psmq_subscribe(&gt_sub_psmq, "/t"));
 	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 's', 0, 0, "/t", NULL));
 }

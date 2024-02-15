@@ -322,19 +322,19 @@ int psmq_pub_main
 					"\n"
 					"usage: \n"
 					"\t%s [-h | -v]\n"
-					"\t%s -b <name> -t <topic> [-m <message> | -e | -B] "
-							"[-n <mqueue-name>] [-p <prio>]"
+					"\t%s -t <topic> [-m <message> | -e | -B] "
+							"[-b <name>] [-n <mqueue-name>] [-p <prio>]"
 					"\n", argv[0], argv[0], argv[0]);
 			printf("\n"
 					"\t-h               print this help and exit\n"
 					"\t-v               print version and exit\n"
-					"\t-b <name>        name of the broker (with leading '/' - like '/qname')\n"
 					"\t-t <topic>       topic on which message should be published\n"
 					"\t-m <message>     message to publish, if not set read from stdin\n"
 					"\t-e               publish message without payload on topic\n"
 					"\t-B               publish stdin read in binary mode\n"
 					"\t-n <mqueue-name> mqueue name to use by pub to receive data from broker\n"
 					"\t                 if not set, default /psmq_pub will be used\n"
+					"\t-b <name>        name of the broker (with leading '/' - like '/qname'). Default /psmqd\n"
 					"\t-t <prio>        message priority, must be int, default: 0\n");
 			printf("\n"
 					"When message is read from stdin, program will send each line as separate\n"
@@ -354,12 +354,6 @@ int psmq_pub_main
 
 	/* validate arguments */
 
-	if (broker_name == NULL)
-	{
-		fprintf(stderr, "f/missing broker name (-b) option\n");
-		return 1;
-	}
-
 	if (topic == NULL)
 	{
 		fprintf(stderr, "f/missing topic (-t) option\n");
@@ -376,8 +370,12 @@ int psmq_pub_main
 	if (qname == NULL)
 		qname = "/psmq_pub";
 
+	/* if broker name was no specified, use default one */
+	if (broker_name == NULL)
+		broker_name = PSMQD_DEFAULT_QNAME;
+
 	/* now the action can start */
-	if (psmq_init(&psmq, broker_name, qname, 2) != 0)
+	if (psmq_init_named(&psmq, broker_name, qname, 2) != 0)
 	{
 		switch(errno)
 		{

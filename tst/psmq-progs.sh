@@ -250,12 +250,6 @@ psmq_sub_output_file_does_not_exit()
     mt_fail "psmq_grep \"f/failed to open file /yea/sure/i/exist for logging\" \
         \"${psmqs_stderr}\""
 }
-psmq_sub_topic_before_broker()
-{
-    ${psmqs_bin} -t/topic 2> ${psmqs_stderr}
-    mt_fail "psmq_grep \"f/subscribe failed, was -b set before -t option?\" \
-        \"${psmqs_stderr}\""
-}
 psmq_sub_invalid_broker_name()
 {
     ${psmqs_bin} -bno-wai 2> ${psmqs_stderr}
@@ -290,7 +284,7 @@ psmq_sub_unknown_argument()
 psmq_sub_no_arguments()
 {
     ${psmqs_bin} 2> ${psmqs_stderr}
-    mt_fail "psmq_grep \"missing -b option\" \"${psmqs_stderr}\""
+    mt_fail "psmq_grep \"missing -t option\" \"${psmqs_stderr}\""
 }
 psmq_sub_broker_go_down_before_client()
 {
@@ -378,13 +372,7 @@ psmq_pub_unknown_argument()
 psmq_pub_no_arguments()
 {
     ${psmqp_bin} 2> ${psmqp_stderr}
-    mt_fail "psmq_grep \"f/missing broker name (-b) option\" \
-        \"${psmqp_stderr}\""
-}
-psmq_pub_missing_b_argument()
-{
-    ${psmqp_bin} -n${psmqp_name} -t/t -mmsg 2> ${psmqp_stderr}
-    mt_fail "psmq_grep \"f/missing broker name (-b) option\" \
+    mt_fail "psmq_grep \"f/missing topic (-t) option\" \
         \"${psmqp_stderr}\""
 }
 psmq_pub_missing_t_argument()
@@ -626,7 +614,6 @@ mt_run psmq_sub_print_version
 mt_run psmq_sub_broker_doesnt_exist
 mt_run psmq_sub_qname_too_long
 mt_run psmq_sub_output_file_does_not_exit
-mt_run psmq_sub_topic_before_broker
 mt_run psmq_sub_invalid_broker_name
 mt_run psmq_sub_invalid_queue_name
 mt_run psmq_sub_missing_argument
@@ -646,7 +633,6 @@ mt_run psmq_pub_invalid_queue_name
 mt_run psmq_pub_missing_argument
 mt_run psmq_pub_unknown_argument
 mt_run psmq_pub_no_arguments
-mt_run psmq_pub_missing_b_argument
 mt_run psmq_pub_missing_t_argument
 mt_run psmq_sub_topic_too_long
 mt_run psmq_pub_empty_message

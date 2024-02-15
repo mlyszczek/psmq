@@ -195,10 +195,10 @@ static void psmqd_wildard_test
 	psmqt_gen_unique_queue_name_array(sub_qname, sub_topics_num + 1, QNAME_LEN);
 	pub_qname = sub_qname[sub_topics_num];
 
-	mt_fok(psmq_init(&pub_psmq, gt_broker_name, pub_qname, 4));
+	mt_fok(psmq_init_named(&pub_psmq, gt_broker_name, pub_qname, 4));
 	for (i = 0; i != sub_topics_num; ++i)
 	{
-		mt_fok(psmq_init(&sub_psmq[i], gt_broker_name, sub_qname[i], 4));
+		mt_fok(psmq_init_named(&sub_psmq[i], gt_broker_name, sub_qname[i], 4));
 		mt_fok(psmq_subscribe(&sub_psmq[i], sub_topics[i]));
 		mt_fok(psmqt_receive_expect(&sub_psmq[i], 's', 0, 0,
 					sub_topics[i], NULL));
@@ -285,7 +285,7 @@ static void psmqd_create_client(void)
 
 
 	psmqt_gen_queue_name(qname, sizeof(qname));
-	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
+	mt_assert(psmq_init_named(&psmq, gt_broker_name, qname, 10) == 0);
 	mt_fok(psmq_cleanup(&psmq));
 	mq_unlink(qname);
 }
@@ -306,7 +306,7 @@ static void psmqd_create_multiple_client(void)
 	psmqt_gen_unique_queue_name_array(qname, 2, QNAME_LEN);
 
 	for (i = 0; i != 2; ++i)
-		mt_assert(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+		mt_assert(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 
 	for (i = 0; i != 2; ++i)
 	{
@@ -331,7 +331,7 @@ static void psmqd_create_max_client(void)
 	psmqt_gen_unique_queue_name_array(qname, PSMQ_MAX_CLIENTS, QNAME_LEN);
 
 	for (i = 0; i != PSMQ_MAX_CLIENTS; ++i)
-		mt_fail(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+		mt_fail(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 
 	for (i = 0; i != PSMQ_MAX_CLIENTS; ++i)
 	{
@@ -355,12 +355,12 @@ static void psmqd_create_too_much_client(void)
 	psmqt_gen_unique_queue_name_array(qname, PSMQ_MAX_CLIENTS + 2, QNAME_LEN);
 
 	for (i = 0; i != PSMQ_MAX_CLIENTS; ++i)
-		mt_fail(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+		mt_fail(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 
 	/* now create 2 clients that won't fit into broker memory */
-	mt_ferr(psmq_init(&psmq[i], gt_broker_name, qname[i], 10), ENOSPC);
+	mt_ferr(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10), ENOSPC);
 	++i;
-	mt_ferr(psmq_init(&psmq[i], gt_broker_name, qname[i], 10), ENOSPC);
+	mt_ferr(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10), ENOSPC);
 
 	for (i = 0; i != PSMQ_MAX_CLIENTS; ++i)
 	{
@@ -370,9 +370,9 @@ static void psmqd_create_too_much_client(void)
 
 	/* now that slots are free, again try to connect those
 	 * two failed connections */
-	mt_fail(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+	mt_fail(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 	++i;
-	mt_fail(psmq_init(&psmq[i], gt_broker_name, qname[i], 10) == 0);
+	mt_fail(psmq_init_named(&psmq[i], gt_broker_name, qname[i], 10) == 0);
 
 	--i;
 	mt_fok(psmq_cleanup(&psmq[i]));
@@ -537,7 +537,7 @@ static void psmqd_subscribe_with_bad_topics(void)
 
 
 	psmqt_gen_queue_name(qname, sizeof(qname));
-	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
+	mt_assert(psmq_init_named(&psmq, gt_broker_name, qname, 10) == 0);
 
 	memset(&msg, 0x00, sizeof(msg));
 
@@ -597,7 +597,7 @@ static void psmqd_unsubscribe_with_bad_topics(void)
 
 
 	psmqt_gen_queue_name(qname, sizeof(qname));
-	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
+	mt_assert(psmq_init_named(&psmq, gt_broker_name, qname, 10) == 0);
 	mt_fok(psmq_subscribe(&psmq, "/t"));
 	mt_fok(psmqt_receive_expect(&psmq, 's', 0, 0, "/t", NULL));
 
@@ -630,7 +630,7 @@ static void psmqd_send_msg_with_bad_fd(void)
 
 
 	psmqt_gen_queue_name(qname, sizeof(qname));
-	mt_assert(psmq_init(&psmq, gt_broker_name, qname, 10) == 0);
+	mt_assert(psmq_init_named(&psmq, gt_broker_name, qname, 10) == 0);
 
 
 	memset(&msg, 0x00, sizeof(msg));
@@ -672,8 +672,8 @@ static void psmqd_detect_dead_client(void)
 
 
 	psmqt_gen_unique_queue_name_array(qname, 2, QNAME_LEN);
-	mt_fail(psmq_init(&pub_psmq, gt_broker_name, qname[0], 10) == 0);
-	mt_fail(psmq_init(&sub_psmq, gt_broker_name, qname[1], 10) == 0);
+	mt_fail(psmq_init_named(&pub_psmq, gt_broker_name, qname[0], 10) == 0);
+	mt_fail(psmq_init_named(&sub_psmq, gt_broker_name, qname[1], 10) == 0);
 	mt_fok(psmq_subscribe(&sub_psmq, "/t"));
 	mt_fok(psmqt_receive_expect(&sub_psmq, 's', 0, 0, "/t", NULL));
 
@@ -741,7 +741,7 @@ static void psmqd_multi_pub_sub(void *arg)
 	{
 		qpub[i] = (char *)malloc(sizeof(char) * QNAME_LEN);
 		psmqt_gen_queue_name(qpub[i], QNAME_LEN);
-		mt_fok(psmq_init(&psmq_pub[i], gt_broker_name, qpub[i], 10));
+		mt_fok(psmq_init_named(&psmq_pub[i], gt_broker_name, qpub[i], 10));
 	}
 
 	psmq_sub = calloc(args->num_sub, sizeof(*psmq_sub));
@@ -750,7 +750,7 @@ static void psmqd_multi_pub_sub(void *arg)
 	{
 		qsub[i] = malloc(sizeof(char) * QNAME_LEN);
 		psmqt_gen_queue_name(qsub[i], QNAME_LEN);
-		mt_fok(psmq_init(&psmq_sub[i], gt_broker_name, qsub[i], 10));
+		mt_fok(psmq_init_named(&psmq_sub[i], gt_broker_name, qsub[i], 10));
 		/* subscribe to "/s" topic, this is "stop" message to
 		 * thread so it knows when to exit */
 		mt_fok(psmq_subscribe(&psmq_sub[i], "/s"));
@@ -1228,8 +1228,8 @@ static void psmqd_reply_to_full_queue(void)
 
 
 	psmqt_gen_unique_queue_name_array(qname, 2, QNAME_LEN);
-	mt_fail(psmq_init(&pub_psmq, gt_broker_name, qname[0], 10) == 0);
-	mt_fail(psmq_init(&sub_psmq, gt_broker_name, qname[1], 2) == 0);
+	mt_fail(psmq_init_named(&pub_psmq, gt_broker_name, qname[0], 10) == 0);
+	mt_fail(psmq_init_named(&sub_psmq, gt_broker_name, qname[1], 2) == 0);
 	mt_fok(psmq_subscribe(&sub_psmq, "/t"));
 	mt_fok(psmqt_receive_expect(&sub_psmq, 's', 0, 0, "/t", NULL));
 	mt_fok(psmq_publish(&pub_psmq, "/t", "1", 2, 0));
