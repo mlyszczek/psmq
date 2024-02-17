@@ -460,6 +460,7 @@ int psmq_init_named
 {
 	struct mq_attr mqa;
 	int            i;
+	char           mqn[9 + 1];
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
@@ -501,17 +502,20 @@ int psmq_init_named
 	{
 		/* mqname not specified, we gotta generate it */
 		const char    *mqname_fmt = "/psmqc%03d";
-		char           mqname[9 + 1];
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+
+		/* mqname is not set, so we will be providing own queue name
+		 * that is stored in mqn array */
+		mqname = mqn;
 
 		/* Iterate thru /psmqc000 - /psmqc255 to find free mqueue */
 		for (i = 0; i < PSMQ_MAX_CLIENTS; i++)
 		{
-			sprintf(mqname, mqname_fmt, i);
+			sprintf(mqn, mqname_fmt, i);
 			/* open mqueue with O_EXCL, this will make sure mq_open(3) will
 			 * return error when queue already exists */
-			psmq->qsub = mq_open(mqname, O_RDONLY | O_CREAT | O_EXCL, 0600, &mqa);
+			psmq->qsub = mq_open(mqn, O_RDONLY | O_CREAT | O_EXCL, 0600, &mqa);
 			if (psmq->qsub != (mqd_t)-1)
 				/* mqueue successfully opened, this is our queue now! */
 				break;
