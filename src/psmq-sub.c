@@ -180,7 +180,15 @@ static int on_receive
 						prio, paylen, topic);
 				el_opmemory(ELN, &psmqs_out, payload, paylen);
 #else
-				printf("p:%u l:%4hu  %s\n", prio, paylen, topic);
+				int i;
+				printf("p:%u l:%4hu  %s", prio, paylen, topic);
+				for (i = 0; i != paylen; i++)
+				{
+					if (!(i % 16))
+						printf("\n0x%04x: ", i);
+					printf("%02x ", payload[i]);
+				}
+				printf("\n");
 #endif
 			}
 			else
