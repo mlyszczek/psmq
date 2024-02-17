@@ -500,7 +500,7 @@ int psmq_init_named
 	else
 	{
 		/* mqname not specified, we gotta generate it */
-		const char    *mqname_fmt = "/psmqc%3d";
+		const char    *mqname_fmt = "/psmqc%03d";
 		char           mqname[9 + 1];
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
