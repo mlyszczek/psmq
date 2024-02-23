@@ -81,7 +81,7 @@ static int publish
 	/* message set in program arguments, simply
 	 * send message and exit */
 
-	if (psmq_publish(psmq, topic, payload, paylen, prio) == 0)
+	if (psmq_publish_prio(psmq, topic, payload, paylen, prio) == 0)
 		return 0;
 
 	switch (errno)

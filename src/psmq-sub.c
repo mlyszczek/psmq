@@ -375,7 +375,7 @@ int psmq_sub_main
 				return 1;
 			}
 
-			if (psmq_receive(&psmq, &msg, NULL) != 0)
+			if (psmq_receive(&psmq, &msg) != 0)
 			{
 				el_operror(OELF, "error reading from queue");
 				psmq_cleanup(&psmq);
@@ -482,7 +482,7 @@ int psmq_sub_main
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-		if (psmq_receive(&psmq, &msg, &prio) != 0)
+		if (psmq_receive_prio(&psmq, &msg, &prio) != 0)
 		{
 			if (flush)
 			{

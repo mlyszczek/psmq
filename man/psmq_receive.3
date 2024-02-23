@@ -8,15 +8,23 @@
 .PP
 .BI "#include <psmq.h>"
 .PP
-.BI "int psmq_receive(struct psmq *" psmq ", struct psmq_msg *" msg ", \
-unsigned *" prio ")"
+.BI "int psmq_receive(struct psmq *" psmq ", struct psmq_msg *" msg ")"
 .br
 .BI "int psmq_timedreceive(struct psmq *" psmq ", struct psmq_msg *" msg ", \
-unsigned *" prio ", struct timespec *" tp ")"
+struct timespec *" tp ")"
 .br
 .BI "int psmq_timedreceive_ms(struct psmq *" psmq ", struct psmq_msg *" msg ", \
-unsigned *" prio ", size_t " ms ")"
+size_t " ms ")"
+.PP
+.BI "int psmq_receive_prio(struct psmq *" psmq ", struct psmq_msg *" msg ", \
+unsigned *" prio ")"
 .br
+.BI "int psmq_timedreceive_prio(struct psmq *" psmq ", struct psmq_msg *" msg ", \
+unsigned *" prio ", struct timespec *" tp ")"
+.br
+.BI "int psmq_timedreceive_prio_ms(struct psmq *" psmq ", struct psmq_msg *" msg ", \
+unsigned *" prio ", size_t " ms ")"
+.PP
 .BI char\ *\ PSMQ_TOPIC(struct\ psmq_msg\  psmq )
 .br
 .BI void\ *\ PSMQ_PAYLOAD(struct\ psmq_msg\  psmq )
@@ -41,42 +49,9 @@ which definition is:
     }
 .fi
 .PP
-.IR ctrl . cmd
-defines type of received message.
-This can be one of:
-.TP
-.B PSMQ_CTRL_CMD_PUBLISH
-Received message on previously subscribed topics.
-.TP
-.B PSMQ_CTRL_CMD_SUBSCRIBE
-Subscribe confirmation has been received.
-.TP
-.B PSMQ_CTRL_CMD_UNSUBSCRIBE
-Unsubscribe confirmation has been received.
-.TP
-.B PSMQ_CTRL_CMD_CLOSE
-Broker closed connection with the client.
-.TP
-.B PSMQ_CTRL_CMD_IOCTL
-Response from the broker for ioctl request.
-.PP
-.IR ctrl . data
-is a response status of received message.
-Or simply return code of a previous request.
-0 is set when request was a success or
-.B errno
-when error occured.
-For example, when
-.BR psmq_subscribe (3)
-has been sent, broker will reply with
-.IR ctrl . cmd
-set to
-.B PSMQ_CTRL_CMD_SUBSCRIBE
-and
-.IR ctrl . data
-set to 0 when subscribe has been successful or, for example
-.B EBADMSG
-when topic was not correct.
+.I ctrl
+structure is mostly for internal purposes and is of very little use
+for user code.
 .PP
 .I data
 contains both topic and payload data.
@@ -99,22 +74,14 @@ is bigger than 0, otherwise you risk getting
 .B SIGSEGV
 from OS.
 .PP
-When
-.IR ctrl . data
-is
-.B PSMQ_CTRL_CMD_IOCTL
-then
-.I data
-will not contain topic but first byte will be ioctl request number
-and all of the following bytes are ioctl specific.
-In general all of reponses from ioctl will require custom parsing.
-Check
-.BR psmq_ioctl (3)
-for all possible ioctls.
-.PP
 .I paylen
-Length of payload part in
-.IR data .
+tells the length of payload part in
+.IR data
+NOT size of data in whole
+.I data
+part.
+Received message always has topic, so this part can be calculated
+automatically.
 .PP
 .BR psmq_timedreceive (3)
 works same way as
@@ -139,6 +106,12 @@ time from the moment function is called, then the function will return.
 If
 .I ms
 is set to 0 and message is not on the queue, function will return immediately.
+.PP
+.B _prio
+versions work the same as their counterparts, but will also store priority
+on which message has been sent.
+This may not be supported on all Operating Systems.
+If this is not supported, default value of 0 will be stored.
 .SH "RETURN VALUE"
 .PP
 When message is received 0 is returned.
@@ -201,7 +174,7 @@ Note: error checking has been ommited for clarity.
             /* now we are ready to receive data. In this example we
              * simply print received rpm */
             struct psmq_msg msg;
-            psmq_receive(&psmq, &msg, NULL);
+            psmq_receive(&psmq, &msg);
             memcpy(&rpm, PSMQ_PAYLOAD(msg), sizeof(rpm));
             printf("topic: %s; rpm %d\en", PSMQ_TOPIC(msg), rpm);
         }

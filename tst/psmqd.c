@@ -106,7 +106,7 @@ static void *multi_sub_thread
 		tl = args->tl;
 		memset(&msg, 0x00, sizeof(msg));
 
-		if (psmq_receive(args->psmq, &msg, NULL) == -1)
+		if (psmq_receive(args->psmq, &msg) == -1)
 			return NULL;
 
 		/* we are being told to stop, so stop */
@@ -156,7 +156,7 @@ static void *multi_pub_thread
 		data[3] = '\0';
 		psmqt_gen_random_string(data + 3, paylen);
 
-		if (psmq_publish(args->psmq, data, data + 3, paylen, 0) != 0)
+		if (psmq_publish(args->psmq, data, data + 3, paylen) != 0)
 			return NULL;
 
 		/* now change '\0' in topic into ' ' and we have nice
@@ -211,7 +211,7 @@ static void psmqd_wildard_test
 		/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-		mt_fok(psmq_publish(&pub_psmq, matches[i].topic, NULL, 0, 0));
+		mt_fok(psmq_publish(&pub_psmq, matches[i].topic, NULL, 0));
 
 		/* receive messages on expected client and
 		 * check if received message is really what was expected */
@@ -239,9 +239,9 @@ static void psmqd_wildard_test
 		 * Don't ask me why, but in this case qnx will return ETIMEDOUT.
 		 * I am not even trying to guess what the fuck is going on in
 		 * this system */
-		mt_ferr(psmq_timedreceive_ms(&sub_psmq[i], &msg, NULL, 0), EINTR);
+		mt_ferr(psmq_timedreceive_ms(&sub_psmq[i], &msg, 0), EINTR);
 #else
-		mt_ferr(psmq_timedreceive_ms(&sub_psmq[i], &msg, NULL, 0), ETIMEDOUT);
+		mt_ferr(psmq_timedreceive_ms(&sub_psmq[i], &msg, 0), ETIMEDOUT);
 #endif
 
 		/* by the way, cleanup clients as we are done */
@@ -389,7 +389,7 @@ static void psmqd_create_too_much_client(void)
 
 static void psmqd_send_empty_msg(void)
 {
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", NULL, 0, 0));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", NULL, 0));
 	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, 0, "/t", NULL));
 }
 
@@ -400,7 +400,7 @@ static void psmqd_send_empty_msg(void)
 
 static void psmqd_send_msg(void)
 {
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", "t", 2, 0));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", "t", 2));
 	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, 2, "/t", "t"));
 }
 
@@ -418,7 +418,7 @@ static void psmqd_send_full_msg(void)
 	psmqt_gen_random_string(buf, sizeof(buf));
 	buf[0] = '\0';
 
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf)));
 	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf), "/t", buf));
 }
 
@@ -441,7 +441,7 @@ static void psmqd_send_too_big_msg(void)
 	memset(&msge, 0x00, sizeof(msge));
 	memset(&pub, 0x00, sizeof(pub));
 
-	mt_ferr(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0), ENOBUFS);
+	mt_ferr(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf)), ENOBUFS);
 
 	pub.data[0] = '/';
 	pub.data[1] = 't';
@@ -451,9 +451,9 @@ static void psmqd_send_too_big_msg(void)
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), ETIMEDOUT);
 #endif
 	mt_fail(memcmp(&msg, &msge, sizeof(msg)) == 0);
 }
@@ -477,9 +477,9 @@ static void psmqd_send_unknown_control_msg(void)
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), ETIMEDOUT);
 #endif
 }
 
@@ -498,14 +498,14 @@ static void psmqd_send_msg_when_noone_is_listening(void)
 	psmqt_gen_random_string(buf, sizeof(buf));
 	buf[0] = '\0';
 
-	mt_fok(psmq_publish(&gt_pub_psmq, "/x", buf, sizeof(buf), 0));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/x", buf, sizeof(buf)));
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs
 	 */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), ETIMEDOUT);
 #endif
 }
 
@@ -567,19 +567,19 @@ static void psmqd_unsubscribe(void)
 
 	psmqt_gen_random_string(buf, sizeof(buf));
 
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf)));
 	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf), "/t", buf));
 
 	mt_fok(psmq_unsubscribe(&gt_sub_psmq, "/t"));
 	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'u', 0, 0, "/t", NULL));
 
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf)));
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), ETIMEDOUT);
 #endif
 }
 
@@ -646,9 +646,9 @@ static void psmqd_send_msg_with_bad_fd(void)
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&psmq, &msg, NULL, 100), EINTR);
+	mt_ferr(psmq_timedreceive_ms(&psmq, &msg, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&psmq, &msg, NULL, 100), ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&psmq, &msg, 100), ETIMEDOUT);
 #endif
 	mt_fail(memcmp(&msg, &msge, sizeof(msg)) == 0);
 	mt_fok(psmq_cleanup(&psmq));
@@ -678,11 +678,11 @@ static void psmqd_detect_dead_client(void)
 	mt_fok(psmqt_receive_expect(&sub_psmq, 's', 0, 0, "/t", NULL));
 
 	for (i = 0; i != 10; ++i)
-		mt_fok(psmq_publish(&pub_psmq, "/t", &i, sizeof(i), 0));
+		mt_fok(psmq_publish(&pub_psmq, "/t", &i, sizeof(i)));
 	/* from now on, messages will be lost and missed pubs should
 	 * be increased in broker */
 	for (i = 0; i != 10; ++i)
-		mt_fok(psmq_publish(&pub_psmq, "/t", &i, sizeof(i), 0));
+		mt_fok(psmq_publish(&pub_psmq, "/t", &i, sizeof(i)));
 
 	/* need to give broker some time to actually publish messages
 	 * before we read them, and making more space on the queue */
@@ -848,7 +848,7 @@ static void psmqd_multi_pub_sub(void *arg)
 	 * all sub threads are subscribe to /s so it's
 	 * enough to send stop by one client only, and
 	 * all clients will receive it */
-	psmq_publish(&psmq_pub[0], "/s", NULL, 0, 0);
+	psmq_publish(&psmq_pub[0], "/s", NULL, 0);
 
 	/* wait for all subscribers to finish
 	 * receiving data and exit */
@@ -1232,9 +1232,9 @@ static void psmqd_reply_to_full_queue(void)
 	mt_fail(psmq_init_named(&sub_psmq, gt_broker_name, qname[1], 2) == 0);
 	mt_fok(psmq_subscribe(&sub_psmq, "/t"));
 	mt_fok(psmqt_receive_expect(&sub_psmq, 's', 0, 0, "/t", NULL));
-	mt_fok(psmq_publish(&pub_psmq, "/t", "1", 2, 0));
-	mt_fok(psmq_publish(&pub_psmq, "/t", "2", 2, 0));
-	mt_fok(psmq_publish(&pub_psmq, "/t", "3", 2, 0));
+	mt_fok(psmq_publish(&pub_psmq, "/t", "1", 2));
+	mt_fok(psmq_publish(&pub_psmq, "/t", "2", 2));
+	mt_fok(psmq_publish(&pub_psmq, "/t", "3", 2));
 
 	/* need to give broker some time to actually publish messages
 	 * before we read them, and making more space on the queue */
@@ -1245,14 +1245,14 @@ static void psmqd_reply_to_full_queue(void)
 #endif
 	tp.tv_nsec = 0;
 	nanosleep(&tp, NULL);
-	mt_fok(psmq_receive(&sub_psmq, &msg, NULL));
-	mt_fok(psmq_receive(&sub_psmq, &msg, NULL));
+	mt_fok(psmq_receive(&sub_psmq, &msg));
+	mt_fok(psmq_receive(&sub_psmq, &msg));
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&sub_psmq, &msg, NULL, 100), EINTR);
+	mt_ferr(psmq_timedreceive_ms(&sub_psmq, &msg, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&sub_psmq, &msg, NULL, 100), ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&sub_psmq, &msg, 100), ETIMEDOUT);
 #endif
 
 	mt_fok(psmq_cleanup(&pub_psmq));

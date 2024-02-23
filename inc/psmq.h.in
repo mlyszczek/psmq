@@ -101,12 +101,19 @@ int psmq_cleanup(struct psmq *psmq);
 int psmq_subscribe(struct psmq *psmq, const char *topic);
 int psmq_unsubscribe(struct psmq *psmq, const char *topic);
 int psmq_publish(struct psmq *psmq, const char *topic, const void *payload,
+		size_t paylen);
+int psmq_publish_prio(struct psmq *psmq, const char *topic, const void *payload,
 		size_t paylen, unsigned int prio);
 
-int psmq_receive(struct psmq *psmq, struct psmq_msg *msg, unsigned *prio);
+int psmq_receive(struct psmq *psmq, struct psmq_msg *msg);
 int psmq_timedreceive(struct psmq *psmq, struct psmq_msg *msg,
+		struct timespec *tp);
+int psmq_timedreceive_ms(struct psmq *psmq, struct psmq_msg *msg, size_t ms);
+
+int psmq_receive_prio(struct psmq *psmq, struct psmq_msg *msg, unsigned *prio);
+int psmq_timedreceive_prio(struct psmq *psmq, struct psmq_msg *msg,
 		unsigned *prio, struct timespec *tp);
-int psmq_timedreceive_ms(struct psmq *psmq, struct psmq_msg *msg,
+int psmq_timedreceive_prio_ms(struct psmq *psmq, struct psmq_msg *msg,
 		unsigned *prio, size_t ms);
 
 int psmq_ioctl(struct psmq *psmq, int req, ...);

@@ -9,6 +9,9 @@
 .BI "#include <psmq.h>"
 .PP
 .BI "int psmq_publish(struct psmq *" psmq ", const char *" topic ", \
+const void *" payload ", size_t " paylen ")"
+.br
+.BI "int psmq_publish_prio(struct psmq *" psmq ", const char *" topic ", \
 const void *" payload ", size_t " paylen ", unsigned int " prio ")"
 .SH DESCRIPTION
 .PP
@@ -18,8 +21,6 @@ data of size
 .I paylen
 on
 .I topic
-with specified
-.I prio
 to broker connected in
 .IR psmq .
 It's ok to set
@@ -30,16 +31,14 @@ In that case
 .I paylen
 will be automatically set to 0.
 .PP
-If broker's control mqueue is full then this function will block until broker
+If broker's control queue is full then this function will block until broker
 deals with some messages and make place in the queue.
-Note that, by default, broker never blocks waiting for clients, so messages
-from mqueue are processed immediately and without unnecessary delays.
-Broker may block waiting for clients when you set high enough response timeout
-value via
-.BR psmq_ioctl_reply_timeout (3).
+Otherwise function will return immediately.
 .PP
-Successfull call means that message has been put into broker's queue with
-success it doesn't necessary mean that any client will receives that message.
+Successfull call doesn't mean any client has received sent message nor that
+any client will receive that message at all.
+It just means that message has been successfully put onto queue and broker
+will deal with this in time.
 It is possible that no clients currently listens on sent
 .I topic
 or client's queue is full and broker dropped that message instead.
@@ -63,11 +62,20 @@ This allows for some flexibility, as one message can contain large topic
 (as in PSMQ_MSG_MAX - 1 large) and no payload, and next publish can
 be opposite - short topic but large payload.
 .PP
-Only real data is sent over mqueue, if
+Only actual data is sent over mqueue.
+If
 .B PSMQ_MSG_MAX
 is large like 256 bytes, but topic + payload is 10 bytes long, only
 these 10 bytes will be actually copied over to the broker and clients,
 not full buffer (256 bytes).
+.PP
+.BR psmq_publish_prio (3)
+works the same, but also accepts message priority to be set.
+Message priority is not supported on all Operating Systems.
+If priority is not supported on your OS, value will simply be ignored.
+.BR psmq_publish (3)
+sends messages with default priority of '0' on systems that support
+message priority.
 .SH "RETURN VALUE"
 .PP
 0 on success. -1 on errors with appropriate errno set.
@@ -107,16 +115,16 @@ Error checking ommited for better readability.
         struct psmq psmq;
         int rpm;
 
-        /* initialize psmq object that will automatically create mqueue for
+        /* initialize psmq object that will automatically create queue for
          * receiving data, and will connect to default broker of name /psmqd.
          * Max items in queue is set to 10 */
         psmq_init(&psmq, 10);
 
-        /* if we don't want to receive any message, we can skip
-         * susbscribe function. */
         /* Now simply send message to broker */
         rpm = 1;
-        psmq_publish(&psmq, "/can/engine/rpm", &rpm, sizeof(rpm), 0);
+        psmq_publish(&psmq, "/can/engine/rpm", &rpm, sizeof(rpm));
+        /* Or send that message with high priority */
+        psmq_publish_prio(&psmq, "/can/engine/rpm", &rpm, sizeof(rpm), 10);
 
         /* after work is finished, we need to deregister from broker to
          * make space in broker for another client */

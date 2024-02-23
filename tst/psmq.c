@@ -139,7 +139,7 @@ static void psmq_unsub_not_subscribed(void)
 
 static void psmq_pub_paylen_and_payload_null(void)
 {
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", NULL, 1, 0));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", NULL, 1));
 }
 
 
@@ -167,7 +167,7 @@ static void psmq_publish_receive(void)
 
 
 	psmqt_gen_random_string(buf, sizeof(buf));
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf)));
 	mt_fok(psmqt_receive_expect(&gt_sub_psmq, 'p', 0, sizeof(buf), "/t", buf));
 }
 
@@ -189,9 +189,9 @@ static void psmq_publish_with_prio(void)
 	psmqt_gen_random_string(buf1, sizeof(buf1));
 	psmqt_gen_random_string(buf2, sizeof(buf2));
 
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf0, sizeof(buf0), 0));
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf1, sizeof(buf1), 3));
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf2, sizeof(buf2), 2));
+	mt_fok(psmq_publish_prio(&gt_pub_psmq, "/t", buf0, sizeof(buf0), 0));
+	mt_fok(psmq_publish_prio(&gt_pub_psmq, "/t", buf1, sizeof(buf1), 3));
+	mt_fok(psmq_publish_prio(&gt_pub_psmq, "/t", buf2, sizeof(buf2), 2));
 
 	/* yield and wait a second so all messages
 	 * with specific priorities are sent */
@@ -220,15 +220,15 @@ static void psmq_publish_timedreceive(void)
 	clock_gettime(CLOCK_REALTIME, &tp);
 	tp.tv_sec += 1;
 	psmqt_gen_random_string(buf, sizeof(buf));
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
-	mt_fok(psmq_timedreceive(&gt_sub_psmq, &msg, NULL, &tp));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf)));
+	mt_fok(psmq_timedreceive(&gt_sub_psmq, &msg, &tp));
 	tp.tv_sec = 0;
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive(&gt_sub_psmq, &msg, NULL, &tp), EINTR);
+	mt_ferr(psmq_timedreceive(&gt_sub_psmq, &msg, &tp), EINTR);
 #else
-	mt_ferr(psmq_timedreceive(&gt_sub_psmq, &msg, NULL, &tp), ETIMEDOUT);
+	mt_ferr(psmq_timedreceive(&gt_sub_psmq, &msg, &tp), ETIMEDOUT);
 #endif
 	mt_fail(strcmp(msg.data, "/t") == 0);
 	mt_fail(memcmp(msg.data + 3, buf, sizeof(buf)) == 0);
@@ -249,14 +249,14 @@ static void psmq_publish_timedreceive_ms(void)
 
 	memset(&msg, 0x00, sizeof(msg));
 	psmqt_gen_random_string(buf, sizeof(buf));
-	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf), 0));
-	mt_fok(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 999));
+	mt_fok(psmq_publish(&gt_pub_psmq, "/t", buf, sizeof(buf)));
+	mt_fok(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 999));
 #if __QNX__ || __QNXNTO
 	/* qnx (up to 6.4.0 anyway) has a bug, which causes mq_timedreceive
 	 * to return EINTR instead of ETIMEDOUT when timeout occurs */
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), EINTR);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), EINTR);
 #else
-	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, NULL, 100), ETIMEDOUT);
+	mt_ferr(psmq_timedreceive_ms(&gt_sub_psmq, &msg, 100), ETIMEDOUT);
 #endif
 	mt_fail(strcmp(msg.data, "/t") == 0);
 	mt_fail(memcmp(msg.data + 3, buf, sizeof(buf)) == 0);
@@ -395,26 +395,33 @@ void psmq_test_group(void)
 	CHECK_ERR(psmq_cleanup(NULL), EINVAL);
 	CHECK_ERR(psmq_cleanup(&psmq_uninit), EBADF);
 
-	CHECK_ERR(psmq_publish(NULL, "/t", NULL, 0, 0), EINVAL);
-	CHECK_ERR(psmq_publish(&psmq_uninit, "/t", NULL, 0, 0), EBADF);
-	CHECK_ERR(psmq_publish(&psmq, NULL, NULL, 0, 0), EINVAL);
-	CHECK_ERR(psmq_publish(&psmq, "t", NULL, 0, 0), EBADMSG);
+	CHECK_ERR(psmq_publish(NULL, "/t", NULL, 0), EINVAL);
+	CHECK_ERR(psmq_publish(&psmq_uninit, "/t", NULL, 0), EBADF);
+	CHECK_ERR(psmq_publish(&psmq, NULL, NULL, 0), EINVAL);
+	CHECK_ERR(psmq_publish(&psmq, "t", NULL, 0), EBADMSG);
 	psmqt_gen_random_string(buf, sizeof(buf));
 	buf[0] = '/';
-	CHECK_ERR(psmq_publish(&psmq, buf, NULL, 0, 0), ENOBUFS);
+	CHECK_ERR(psmq_publish(&psmq, buf, NULL, 0), ENOBUFS);
 	buf[PSMQ_MSG_MAX] = '\0';
-	CHECK_ERR(psmq_publish(&psmq, buf, NULL, 0, 0), ENOBUFS);
+	CHECK_ERR(psmq_publish(&psmq, buf, NULL, 0), ENOBUFS);
 	buf[1] = 't';
 	buf[2] = '\0';
-	CHECK_ERR(psmq_publish(&psmq, buf, NULL, PSMQ_MSG_MAX, 0), ENOBUFS);
-	CHECK_ERR(psmq_publish(&psmq, buf, NULL, PSMQ_MSG_MAX - 2, 0), ENOBUFS);
+	CHECK_ERR(psmq_publish(&psmq, buf, NULL, PSMQ_MSG_MAX), ENOBUFS);
+	CHECK_ERR(psmq_publish(&psmq, buf, NULL, PSMQ_MSG_MAX - 2), ENOBUFS);
 
-	CHECK_ERR(psmq_receive(NULL, &msg, NULL), EINVAL);
-	CHECK_ERR(psmq_receive(&psmq_uninit, &msg, NULL), EBADF);
-	CHECK_ERR(psmq_timedreceive(NULL, &msg, NULL, &tp), EINVAL);
-	CHECK_ERR(psmq_timedreceive(&psmq_uninit, &msg, NULL, &tp), EBADF);
-	CHECK_ERR(psmq_timedreceive_ms(NULL, &msg, NULL, 0), EINVAL);
-	CHECK_ERR(psmq_timedreceive_ms(&psmq_uninit, &msg, NULL, 0), EBADF);
+	CHECK_ERR(psmq_receive(NULL, &msg), EINVAL);
+	CHECK_ERR(psmq_receive(&psmq_uninit, &msg), EBADF);
+	CHECK_ERR(psmq_timedreceive(NULL, &msg, &tp), EINVAL);
+	CHECK_ERR(psmq_timedreceive(&psmq_uninit, &msg, &tp), EBADF);
+	CHECK_ERR(psmq_timedreceive_ms(NULL, &msg, 0), EINVAL);
+	CHECK_ERR(psmq_timedreceive_ms(&psmq_uninit, &msg, 0), EBADF);
+
+	CHECK_ERR(psmq_receive_prio(NULL, &msg, NULL), EINVAL);
+	CHECK_ERR(psmq_receive_prio(&psmq_uninit, &msg, NULL), EBADF);
+	CHECK_ERR(psmq_timedreceive_prio(NULL, &msg, NULL, &tp), EINVAL);
+	CHECK_ERR(psmq_timedreceive_prio(&psmq_uninit, &msg, NULL, &tp), EBADF);
+	CHECK_ERR(psmq_timedreceive_prio_ms(NULL, &msg, NULL, 0), EINVAL);
+	CHECK_ERR(psmq_timedreceive_prio_ms(&psmq_uninit, &msg, NULL, 0), EBADF);
 
 	CHECK_ERR(psmq_subscribe(NULL, "/t"), EINVAL);
 	CHECK_ERR(psmq_subscribe(&psmq_uninit, "/t"), EBADF);
@@ -437,17 +444,20 @@ void psmq_test_group(void)
 	mt_prepare_test = psmqt_prepare_test_with_clients;
 	mt_cleanup_test = psmqt_cleanup_test_with_clients;
 
-	CHECK_ERR(psmq_receive(&gt_pub_psmq, NULL, NULL), EINVAL);
+	CHECK_ERR(psmq_receive(&gt_pub_psmq, NULL), EINVAL);
+	CHECK_ERR(psmq_receive_prio(&gt_pub_psmq, NULL, NULL), EINVAL);
 
-	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, NULL, NULL, &tp), EINVAL);
-	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, &msg, NULL, NULL), EINVAL);
+	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, NULL, &tp), EINVAL);
+	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, &msg, NULL), EINVAL);
+	CHECK_ERR(psmq_timedreceive_prio(&gt_pub_psmq, NULL, NULL, &tp), EINVAL);
+	CHECK_ERR(psmq_timedreceive_prio(&gt_pub_psmq, &msg, NULL, NULL), EINVAL);
 #ifndef __NetBSD__
 	/* netbsd is supposed to return error here, but for some reasons
 	 * it behaves as if we passed time = 0, and it returns immediately
 	 * with ETIMEDOUT. Ignore this test on netbsd in that case */
-	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, &msg, NULL, &tp_inval), EINVAL);
+	CHECK_ERR(psmq_timedreceive(&gt_pub_psmq, &msg, &tp_inval), EINVAL);
 #endif
-	CHECK_ERR(psmq_timedreceive_ms(&gt_pub_psmq, NULL, NULL, 0), EINVAL);
+	CHECK_ERR(psmq_timedreceive_ms(&gt_pub_psmq, NULL, 0), EINVAL);
 
 	CHECK_ERR(psmq_subscribe(&gt_pub_psmq, NULL), EINVAL);
 	CHECK_ERR(psmq_subscribe(&gt_pub_psmq, ""), EINVAL);

@@ -133,7 +133,7 @@ int psmq_publish_msg
    ========================================================================== */
 
 
-int psmq_publish
+int psmq_publish_prio
 (
 	struct psmq     *psmq,     /* psmq object */
 	const char      *topic,    /* topic of message to be sent */
@@ -157,6 +157,23 @@ int psmq_publish
 
 
 /* ==========================================================================
+    Same as psmq_publish_prio but with default priority of 0.
+   ========================================================================== */
+
+
+int psmq_publish
+(
+	struct psmq     *psmq,     /* psmq object */
+	const char      *topic,    /* topic of message to be sent */
+	const void      *payload,  /* payload of message to be sent */
+	size_t           paylen    /* length of payload buffer */
+)
+{
+	return psmq_publish_prio(psmq, topic, payload, paylen, 0);
+}
+
+
+/* ==========================================================================
     Waits for message to be received from broker. Message is stored in msg
     buffer provided by caller. Function will receive both subscribed message
     as well as control messages (like subscribe confirmation). Function waits
@@ -173,7 +190,7 @@ int psmq_publish
    ========================================================================== */
 
 
-int psmq_receive
+int psmq_receive_prio
 (
 	struct psmq      *psmq,  /* psmq object */
 	struct psmq_msg  *msg,   /* received message */
@@ -187,6 +204,21 @@ int psmq_receive
 
 	/* return -1 on error otherwise return 0 */
 	return -(mq_receive(psmq->qsub, (char *)msg, sizeof(*msg), prio) == -1);
+}
+
+
+/* ==========================================================================
+    Same as psmq_receive_prio, but ignores priority.
+   ========================================================================== */
+
+
+int psmq_receive
+(
+	struct psmq      *psmq,  /* psmq object */
+	struct psmq_msg  *msg    /* received message */
+)
+{
+	return psmq_receive_prio(psmq, msg, NULL);
 }
 
 
@@ -218,7 +250,7 @@ int psmq_receive
    ========================================================================== */
 
 
-int psmq_timedreceive
+int psmq_timedreceive_prio
 (
 	struct psmq      *psmq,  /* psmq object */
 	struct psmq_msg  *msg,   /* received message */
@@ -234,6 +266,22 @@ int psmq_timedreceive
 
 	return -(mq_timedreceive(psmq->qsub, (char *)msg,
 				sizeof(*msg), prio, tp) == -1);
+}
+
+
+/* ==========================================================================
+    Same as psmq_timedreceive_prio but ignores priority.
+   ========================================================================== */
+
+
+int psmq_timedreceive
+(
+	struct psmq      *psmq,  /* psmq object */
+	struct psmq_msg  *msg,   /* received message */
+	struct timespec  *tp     /* absolute time to wait for timeout */
+)
+{
+	return psmq_timedreceive_prio(psmq, msg, NULL, tp);
 }
 
 
@@ -261,7 +309,7 @@ int psmq_timedreceive
    ========================================================================== */
 
 
-int psmq_timedreceive_ms
+int psmq_timedreceive_prio_ms
 (
 	struct psmq      *psmq,  /* psmq object */
 	struct psmq_msg  *msg,   /* received message */
@@ -272,14 +320,24 @@ int psmq_timedreceive_ms
 	struct timespec   tp;    /* absolute time to wait for timeout */
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-	VALID(EINVAL, psmq);
-	VALID(EINVAL, msg);
-	VALID(EBADF, psmq->qpub != (mqd_t)-1);
-	VALID(EBADF, psmq->qsub != psmq->qpub);
-
 	psmq_ms_to_tp(ms, &tp);
-	return -(mq_timedreceive(psmq->qsub, (char *)msg,
-				sizeof(*msg), prio, &tp) == -1);
+	return psmq_timedreceive_prio(psmq, msg, prio, &tp);
+}
+
+
+/* ==========================================================================
+    Same as psmq_timedreceive_prio_ms but ignores priority.
+   ========================================================================== */
+
+
+int psmq_timedreceive_ms
+(
+	struct psmq      *psmq,  /* psmq object */
+	struct psmq_msg  *msg,   /* received message */
+	size_t            ms     /* ms to wait until timeout occurs */
+)
+{
+	return psmq_timedreceive_prio_ms(psmq, msg, NULL, ms);
 }
 
 
@@ -353,7 +411,7 @@ static int psmq_init_wq
 
 
 		memset(&msg, 0x00, sizeof(msg));
-		if ((ack = psmq_timedreceive_ms(psmq, &msg, NULL, 30000)) == -1)
+		if ((ack = psmq_timedreceive_ms(psmq, &msg, 30000)) == -1)
 			break;
 
 		/* open response is suppose to send back
