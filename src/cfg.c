@@ -237,7 +237,7 @@ void psmqd_cfg_print(void)
 	if (g_psmqd_cfg.program_log)
 		CONFIG_PRINT(program_log, "%s");
 	else
-		CONFIG_PRINT(program_log, "(stderr)");
+		el_oprint(OELN, "%s%s %s", "program_log", padder + strlen("program_log"), "(stderr)");
 	CONFIG_PRINT(broker_name, "%s");
 	CONFIG_PRINT(broker_maxmsg, "%d");
 	CONFIG_PRINT(remove_queue, "%d");
